@@ -85,6 +85,25 @@ async function sendPasswordResetOtpEmail(email, employeeName, otp) {
   });
 }
 
+function getFriendlySmtpErrorMessage(error) {
+  const message = String(error?.message || "");
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("timeout")) {
+    return "Connection timeout khi ket noi SMTP. Vui long kiem tra SMTP_HOST, SMTP_PORT va SMTP_SECURE tren Railway.";
+  }
+
+  if (normalized.includes("auth")) {
+    return "SMTP dang tu choi dang nhap. Vui long kiem tra SMTP_USER va SMTP_PASS.";
+  }
+
+  if (normalized.includes("smtp")) {
+    return message;
+  }
+
+  return message || "Khong the gui ma OTP.";
+}
+
 async function resolveDeviceImageColumn() {
   try {
     const rows = await query(
@@ -972,8 +991,10 @@ app.post("/api/auth/forgot-password/request", async (req, res) => {
       message: "Da gui ma OTP qua email. Vui long kiem tra hop thu cua ban.",
     });
   } catch (error) {
-    const statusCode = String(error.message || "").toLowerCase().includes("smtp") ? 503 : 500;
-    return res.status(statusCode).json({ message: error.message || "Khong the gui ma OTP.", error: error.message });
+    const friendlyMessage = getFriendlySmtpErrorMessage(error);
+    const statusCode =
+      friendlyMessage.toLowerCase().includes("smtp") || friendlyMessage.toLowerCase().includes("timeout") ? 503 : 500;
+    return res.status(statusCode).json({ message: friendlyMessage, error: error.message });
   }
 });
 
