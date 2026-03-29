@@ -2,7 +2,6 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import crypto from "crypto";
-import nodemailer from "nodemailer";
 import path from "path";
 import { fileURLToPath } from "url";
 import { checkDatabaseConnection, getConnection, query } from "./db.js";
@@ -32,7 +31,7 @@ function hashOtp(otp) {
   return crypto.createHash("sha256").update(String(otp)).digest("hex");
 }
 
-function getMailerConfig() {
+function legacyGetMailerConfig() {
   const host = process.env.SMTP_HOST?.trim();
   const port = Number(process.env.SMTP_PORT || 587);
   const secure = String(process.env.SMTP_SECURE || "false").toLowerCase() === "true";
@@ -61,8 +60,8 @@ function getMailerConfig() {
   };
 }
 
-async function sendPasswordResetOtpEmail(email, employeeName, otp) {
-  const { transporter, from } = getMailerConfig();
+async function legacySendPasswordResetOtpEmail(email, employeeName, otp) {
+  const { transporter, from } = legacyGetMailerConfig();
 
   await transporter.sendMail({
     from,
@@ -85,7 +84,7 @@ async function sendPasswordResetOtpEmail(email, employeeName, otp) {
   });
 }
 
-function getFriendlySmtpErrorMessage(error) {
+function legacyGetFriendlySmtpErrorMessage(error) {
   const message = String(error?.message || "");
   const normalized = message.toLowerCase();
 
@@ -102,6 +101,104 @@ function getFriendlySmtpErrorMessage(error) {
   }
 
   return message || "Khong the gui ma OTP.";
+}
+
+function parseMailFrom(value = "") {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    throw new Error("Chua cau hinh MAIL_FROM tren Railway.");
+  }
+
+  const matchedSender = trimmedValue.match(/^(.*)<([^>]+)>$/);
+  if (matchedSender) {
+    return {
+      name: matchedSender[1].trim().replace(/^\"|\"$/g, "") || "TechHUB",
+      email: matchedSender[2].trim(),
+    };
+  }
+
+  return {
+    name: "TechHUB",
+    email: trimmedValue,
+  };
+}
+
+async function sendPasswordResetOtpEmail(email, employeeName, otp) {
+  const apiKey = process.env.BREVO_API_KEY?.trim();
+  const sender = parseMailFrom(process.env.MAIL_FROM?.trim() || "");
+
+  if (!apiKey) {
+    throw new Error("Chua cau hinh BREVO_API_KEY tren Railway.");
+  }
+
+  const subject = "TechHUB - Ma OTP dat lai mat khau";
+  const textContent = `Xin chao ${employeeName}, ma OTP dat lai mat khau cua ban la ${otp}. Ma co hieu luc trong 10 phut.`;
+  const htmlContent = `
+    <div style="font-family: Arial, Helvetica, sans-serif; color: #1f2937; line-height: 1.6;">
+      <h2 style="margin-bottom: 8px;">TechHUB - Dat lai mat khau</h2>
+      <p>Xin chao <strong>${employeeName}</strong>,</p>
+      <p>Ban vua yeu cau dat lai mat khau cho tai khoan nhan vien.</p>
+      <p>Ma OTP cua ban la:</p>
+      <div style="font-size: 28px; font-weight: 700; letter-spacing: 8px; color: #b42318; margin: 16px 0;">
+        ${otp}
+      </div>
+      <p>Ma nay co hieu luc trong <strong>10 phut</strong>.</p>
+      <p>Neu ban khong thuc hien yeu cau nay, vui long bo qua email.</p>
+    </div>
+  `;
+
+  const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "api-key": apiKey,
+    },
+    body: JSON.stringify({
+      sender,
+      to: [{ email }],
+      subject,
+      textContent,
+      htmlContent,
+    }),
+  });
+
+  if (!response.ok) {
+    const payload = await response.text();
+    throw new Error(`Brevo API error ${response.status}: ${payload}`);
+  }
+}
+
+function getFriendlySmtpErrorMessage(error) {
+  const message = String(error?.message || "");
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("brevo_api_key")) {
+    return "Railway chua co BREVO_API_KEY de gui email OTP.";
+  }
+
+  if (normalized.includes("mail_from")) {
+    return "Railway chua cau hinh MAIL_FROM hop le cho Brevo.";
+  }
+
+  if (normalized.includes("unauthorized") || normalized.includes("invalid api key")) {
+    return "BREVO_API_KEY khong hop le. Vui long tao API key moi trong Brevo.";
+  }
+
+  if (normalized.includes("sender")) {
+    return "Email gui chua duoc xac minh tren Brevo. Vui long vao Senders de verify MAIL_FROM.";
+  }
+
+  if (normalized.includes("brevo api error")) {
+    return message;
+  }
+
+  if (normalized.includes("timeout") || normalized.includes("fetch failed")) {
+    return "Server Railway khong ket noi duoc toi Brevo API. Vui long redeploy lai va thu lai sau.";
+  }
+
+  return message || "Khong the gui ma OTP qua Brevo.";
 }
 
 async function resolveDeviceImageColumn() {
@@ -992,8 +1089,14 @@ app.post("/api/auth/forgot-password/request", async (req, res) => {
     });
   } catch (error) {
     const friendlyMessage = getFriendlySmtpErrorMessage(error);
+    const normalizedMessage = friendlyMessage.toLowerCase();
     const statusCode =
-      friendlyMessage.toLowerCase().includes("smtp") || friendlyMessage.toLowerCase().includes("timeout") ? 503 : 500;
+      normalizedMessage.includes("brevo") ||
+      normalizedMessage.includes("sender") ||
+      normalizedMessage.includes("timeout") ||
+      normalizedMessage.includes("redeploy")
+        ? 503
+        : 500;
     return res.status(statusCode).json({ message: friendlyMessage, error: error.message });
   }
 });
