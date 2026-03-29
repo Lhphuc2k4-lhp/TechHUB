@@ -884,10 +884,11 @@ app.get("/api/health", async (_req, res) => {
   }
 });
 
-app.post("/api/auth/login", async (req, res) => {
+async function handleLogin(req, res) {
   try {
-    const identifier = req.body.identifier?.trim();
-    const password = req.body.password?.trim();
+    const source = req.method === "GET" ? req.query : req.body;
+    const identifier = source.identifier?.trim();
+    const password = source.password?.trim();
 
     if (!identifier || !password) {
       return res.status(400).json({ message: "Vui long nhap tai khoan va mat khau." });
@@ -923,7 +924,10 @@ app.post("/api/auth/login", async (req, res) => {
   } catch (error) {
     return res.status(500).json({ message: "Khong the dang nhap.", error: error.message });
   }
-});
+}
+
+app.get("/api/auth/login", handleLogin);
+app.post("/api/auth/login", handleLogin);
 
 app.post("/api/auth/forgot-password/request", async (req, res) => {
   try {
