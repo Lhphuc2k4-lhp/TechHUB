@@ -49,6 +49,9 @@ function getMailerConfig() {
       host,
       port,
       secure,
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
       auth: {
         user,
         pass,
@@ -969,7 +972,8 @@ app.post("/api/auth/forgot-password/request", async (req, res) => {
       message: "Da gui ma OTP qua email. Vui long kiem tra hop thu cua ban.",
     });
   } catch (error) {
-    return res.status(500).json({ message: error.message || "Khong the gui ma OTP.", error: error.message });
+    const statusCode = String(error.message || "").toLowerCase().includes("smtp") ? 503 : 500;
+    return res.status(statusCode).json({ message: error.message || "Khong the gui ma OTP.", error: error.message });
   }
 });
 
@@ -1123,6 +1127,42 @@ app.get("/api/employees/:id", async (req, res) => {
     return res.json(mapEmployee(rows[0]));
   } catch (error) {
     return res.status(500).json({ message: "Khong lay duoc thong tin tai khoan.", error: error.message });
+  }
+});
+
+app.delete("/api/employees/:id", async (req, res) => {
+  try {
+    const employeeId = Number(req.params.id);
+
+    if (Number.isNaN(employeeId)) {
+      return res.status(400).json({ message: "ID nhan vien khong hop le." });
+    }
+
+    const rows = await query(`SELECT id, role FROM nhanvien WHERE id = ? LIMIT 1`, [employeeId]);
+
+    if (!rows.length) {
+      return res.status(404).json({ message: "Khong tim thay tai khoan can xoa." });
+    }
+
+    if (Number(rows[0].role) === 0) {
+      return res.status(400).json({ message: "Khong duoc xoa tai khoan quan tri." });
+    }
+
+    const [loanRows, fineRows] = await Promise.all([
+      query(`SELECT COUNT(*) AS total FROM phieumuon WHERE nhan_vien_id = ?`, [employeeId]).catch(() => [{ total: 0 }]),
+      query(`SELECT COUNT(*) AS total FROM phieuphat WHERE nhan_vien_id = ?`, [employeeId]).catch(() => [{ total: 0 }]),
+    ]);
+
+    if (Number(loanRows[0]?.total || 0) > 0 || Number(fineRows[0]?.total || 0) > 0) {
+      return res.status(400).json({
+        message: "Tai khoan nay da duoc su dung trong phieu muon hoac phieu phat, khong the xoa.",
+      });
+    }
+
+    await query(`DELETE FROM nhanvien WHERE id = ?`, [employeeId]);
+    return res.json({ message: "Da xoa tai khoan nhan vien thanh cong." });
+  } catch (error) {
+    return res.status(500).json({ message: "Khong the xoa tai khoan.", error: error.message });
   }
 });
 
