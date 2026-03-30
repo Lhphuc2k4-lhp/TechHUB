@@ -308,14 +308,17 @@ function buildDeviceSelectSql(extraWhereClause = "", extraOrderClause = "ORDER B
       tb.sku,
       tb.mo_ta AS description,
       tb.url_san_pham AS product_url,
-      tb.tong_so_luong AS total_quantity,
+      1 AS total_quantity,
       tb.${deviceImageColumn} AS image_url,
       tb.loai_id AS type_id,
       lt.ten_loai AS type_name,
       tb.tinh_trang_id AS status_id,
       tttb.ten_tinh_trang AS status_name,
-      ${borrowedQuantitySql} AS borrowed_quantity,
-      GREATEST(tb.tong_so_luong - ${borrowedQuantitySql}, 0) AS available_quantity
+      CASE WHEN ${borrowedQuantitySql} > 0 THEN 1 ELSE 0 END AS borrowed_quantity,
+      CASE
+        WHEN tb.tinh_trang_id = 1 AND ${borrowedQuantitySql} = 0 THEN 1
+        ELSE 0
+      END AS available_quantity
     FROM thietbi tb
     LEFT JOIN loaithietbi lt ON lt.id = tb.loai_id
     LEFT JOIN tinhtrangthietbi tttb ON tttb.id = tb.tinh_trang_id
@@ -327,9 +330,9 @@ function buildDeviceSelectSql(extraWhereClause = "", extraOrderClause = "ORDER B
 
 function mapDevice(row) {
   const normalizedStatus = normalizeText(row.status_name || "");
-  const totalQuantity = Number(row.total_quantity || 0);
-  const borrowedQuantity = Number(row.borrowed_quantity || 0);
-  const availableQuantity = Number(row.available_quantity ?? totalQuantity);
+  const totalQuantity = 1;
+  const borrowedQuantity = Number(row.borrowed_quantity || 0) > 0 ? 1 : 0;
+  const availableQuantity = Number(row.available_quantity || 0) > 0 ? 1 : 0;
   const isMaintenance = normalizedStatus !== "tot";
   const isBorrowedOut = !isMaintenance && borrowedQuantity > 0 && availableQuantity === 0;
   const statusLabel = isMaintenance ? "Cần bảo trì" : isBorrowedOut ? "Đang mượn" : "Sẵn sàng";
@@ -380,21 +383,16 @@ function normalizeDevicePayload(body = {}) {
     productUrl: body.productUrl?.trim() || null,
     typeId: Number(body.typeId),
     statusId: Number(body.statusId),
-    totalQuantity: Number(body.totalQuantity),
   };
 }
 
 async function validateDevicePayload(payload, deviceId = null) {
-  if (!payload.code || !payload.name || !payload.typeId || !payload.statusId || !payload.totalQuantity) {
+  if (!payload.code || !payload.name || !payload.typeId || !payload.statusId) {
     throw new Error("Vui lÃ²ng nháº­p Ä‘áº§y Ä‘á»§ thÃ´ng tin thiáº¿t bá»‹.");
   }
 
-  if (Number.isNaN(payload.typeId) || Number.isNaN(payload.statusId) || Number.isNaN(payload.totalQuantity)) {
+  if (Number.isNaN(payload.typeId) || Number.isNaN(payload.statusId)) {
     throw new Error("Dá»¯ liá»‡u thiáº¿t bá»‹ khÃ´ng há»£p lá»‡.");
-  }
-
-  if (payload.totalQuantity < 1) {
-    throw new Error("Tá»•ng sá»‘ lÆ°á»£ng thiáº¿t bá»‹ pháº£i lá»›n hÆ¡n 0.");
   }
 
   const typeRows = await query(`SELECT id FROM loaithietbi WHERE id = ? LIMIT 1`, [payload.typeId]);
@@ -772,7 +770,6 @@ async function restoreDevices(rows) {
       productUrl: pickRowValue(row, ["Link san pham", "Product URL"]) || null,
       typeId,
       statusId,
-      totalQuantity: Math.max(1, parseNumberValue(pickRowValue(row, ["Tong so luong", "Total Quantity"])) || 1),
     };
 
     const existingRows = await query(
@@ -799,7 +796,6 @@ async function restoreDevices(rows) {
             sku = ?,
             mo_ta = ?,
             url_san_pham = ?,
-            tong_so_luong = ?,
             tinh_trang_id = ?,
             ${deviceImageColumn} = ?
           WHERE id = ?
@@ -813,7 +809,6 @@ async function restoreDevices(rows) {
           payload.sku,
           payload.description,
           payload.productUrl,
-          payload.totalQuantity,
           payload.statusId,
           payload.imageUrl,
           Number(existingRows[0].id),
@@ -832,11 +827,10 @@ async function restoreDevices(rows) {
             sku,
             mo_ta,
             url_san_pham,
-            tong_so_luong,
             tinh_trang_id,
             ${deviceImageColumn}
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
         [
           payload.code,
@@ -847,7 +841,6 @@ async function restoreDevices(rows) {
           payload.sku,
           payload.description,
           payload.productUrl,
-          payload.totalQuantity,
           payload.statusId,
           payload.imageUrl,
         ]
@@ -1416,7 +1409,7 @@ app.get("/api/device-types", async (_req, res) => {
         SELECT
           lt.id,
           lt.ten_loai AS name,
-          COALESCE(SUM(tb.tong_so_luong), 0) AS total_devices
+          COUNT(tb.id) AS total_devices
         FROM loaithietbi lt
         LEFT JOIN thietbi tb ON tb.loai_id = lt.id
         GROUP BY lt.id, lt.ten_loai
@@ -1454,9 +1447,9 @@ app.get("/api/dashboard/summary", async (_req, res) => {
       query(
         `
           SELECT
-            COALESCE(SUM(tb.tong_so_luong), 0) AS total_devices,
-            COALESCE(SUM(CASE WHEN tb.tinh_trang_id = 1 THEN GREATEST(tb.tong_so_luong - ${borrowedQuantitySql}, 0) ELSE 0 END), 0) AS ready_devices,
-            SUM(CASE WHEN tb.tinh_trang_id <> 1 OR GREATEST(tb.tong_so_luong - ${borrowedQuantitySql}, 0) = 0 THEN 1 ELSE 0 END) AS maintenance_devices
+            COUNT(*) AS total_devices,
+            SUM(CASE WHEN tb.tinh_trang_id = 1 AND ${borrowedQuantitySql} = 0 THEN 1 ELSE 0 END) AS ready_devices,
+            SUM(CASE WHEN tb.tinh_trang_id <> 1 OR ${borrowedQuantitySql} > 0 THEN 1 ELSE 0 END) AS maintenance_devices
           FROM thietbi tb
         `
       ),
@@ -1544,11 +1537,10 @@ app.post("/api/devices", async (req, res) => {
           sku,
           mo_ta,
           url_san_pham,
-          tong_so_luong,
           tinh_trang_id,
           ${deviceImageColumn}
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         payload.code,
@@ -1559,7 +1551,6 @@ app.post("/api/devices", async (req, res) => {
         payload.sku,
         payload.description,
         payload.productUrl,
-        payload.totalQuantity,
         payload.statusId,
         payload.imageUrl,
       ]
@@ -1602,25 +1593,6 @@ app.put("/api/devices/:id", async (req, res) => {
       return res.status(404).json({ message: "KhÃ´ng tÃ¬m tháº¥y thiáº¿t bá»‹." });
     }
 
-    const existingDevice = mapDevice(existingRows[0]);
-    const activeBorrowRows = await query(
-      `
-        SELECT COALESCE(SUM(ctpm.so_luong), 0) AS borrowed_quantity
-        FROM chitietphieumuon ctpm
-        INNER JOIN phieumuon pm ON pm.id = ctpm.phieu_muon_id
-        WHERE ctpm.thiet_bi_id = ?
-          AND pm.trang_thai IN ('dang_muon', 'qua_han')
-      `,
-      [deviceId]
-    );
-    const borrowedQuantity = Number(activeBorrowRows[0]?.borrowed_quantity || 0);
-
-    if (payload.totalQuantity < borrowedQuantity) {
-      return res.status(400).json({
-        message: `KhÃ´ng thá»ƒ giáº£m tá»•ng sá»‘ lÆ°á»£ng nhá» hÆ¡n sá»‘ Ä‘ang mÆ°á»£n (${borrowedQuantity}).`,
-      });
-    }
-
     await validateDevicePayload(payload, deviceId);
 
     await query(
@@ -1635,7 +1607,6 @@ app.put("/api/devices/:id", async (req, res) => {
           sku = ?,
           mo_ta = ?,
           url_san_pham = ?,
-          tong_so_luong = ?,
           tinh_trang_id = ?,
           ${deviceImageColumn} = ?
         WHERE id = ?
@@ -1649,7 +1620,6 @@ app.put("/api/devices/:id", async (req, res) => {
         payload.sku,
         payload.description,
         payload.productUrl,
-        payload.totalQuantity,
         payload.statusId,
         payload.imageUrl,
         deviceId,
@@ -1657,10 +1627,7 @@ app.put("/api/devices/:id", async (req, res) => {
     );
 
     return res.json({
-      message:
-        existingDevice.totalQuantity !== payload.totalQuantity
-          ? "Cáº­p nháº­t thiáº¿t bá»‹ thÃ nh cÃ´ng vÃ  Ä‘Ã£ Ä‘iá»u chá»‰nh sá»‘ lÆ°á»£ng tá»“n kho."
-          : "Cáº­p nháº­t thiáº¿t bá»‹ thÃ nh cÃ´ng.",
+      message: "Cáº­p nháº­t thiáº¿t bá»‹ thÃ nh cÃ´ng.",
     });
   } catch (error) {
     return res.status(500).json({ message: error.message || "KhÃ´ng thá»ƒ cáº­p nháº­t thiáº¿t bá»‹.", error: error.message });
@@ -1762,8 +1729,8 @@ app.post("/api/loan-slips", async (req, res) => {
   }
 
   const normalizedItems = items
-    .map((item) => ({ deviceId: Number(item.deviceId), quantity: Number(item.quantity), note: item.note?.trim() || null }))
-    .filter((item) => item.deviceId && item.quantity > 0);
+    .map((item) => ({ deviceId: Number(item.deviceId), quantity: 1, note: item.note?.trim() || null }))
+    .filter((item) => item.deviceId);
 
   if (!normalizedItems.length) {
     return res.status(400).json({ message: "Phiáº¿u mÆ°á»£n cáº§n Ã­t nháº¥t má»™t thiáº¿t bá»‹ há»£p lá»‡." });
@@ -1798,8 +1765,8 @@ app.post("/api/loan-slips", async (req, res) => {
         throw new Error(`Thiáº¿t bá»‹ "${matchedDevice.name}" hiá»‡n khÃ´ng sáºµn sÃ ng Ä‘á»ƒ mÆ°á»£n.`);
       }
 
-      if (item.quantity > matchedDevice.availableQuantity) {
-        throw new Error(`Sá»‘ lÆ°á»£ng mÆ°á»£n cá»§a "${matchedDevice.name}" vÆ°á»£t quÃ¡ sá»‘ lÆ°á»£ng cÃ²n trong (${matchedDevice.availableQuantity}).`);
+      if (matchedDevice.availableQuantity < 1) {
+        throw new Error(`Thiáº¿t bá»‹ "${matchedDevice.name}" khÃ´ng cÃ²n sáºµn Ä‘á»ƒ mÆ°á»£n.`);
       }
     }
 
@@ -1821,7 +1788,7 @@ app.post("/api/loan-slips", async (req, res) => {
           INSERT INTO chitietphieumuon (phieu_muon_id, thiet_bi_id, so_luong, tinh_trang_luc_muon, ghi_chu)
           VALUES (?, ?, ?, ?, ?)
         `,
-        [slipResult.insertId, item.deviceId, item.quantity, matchedDevice.statusName || "Tot", item.note]
+        [slipResult.insertId, item.deviceId, 1, matchedDevice.statusName || "Tot", item.note]
       );
     }
 
