@@ -1436,8 +1436,8 @@ app.get("/api/dashboard/summary", async (_req, res) => {
       query(
         `
           SELECT
-            COUNT(*) AS total_devices,
-            SUM(CASE WHEN tb.tinh_trang_id = 1 AND GREATEST(tb.tong_so_luong - ${borrowedQuantitySql}, 0) > 0 THEN 1 ELSE 0 END) AS ready_devices,
+            COALESCE(SUM(tb.tong_so_luong), 0) AS total_devices,
+            COALESCE(SUM(CASE WHEN tb.tinh_trang_id = 1 THEN GREATEST(tb.tong_so_luong - ${borrowedQuantitySql}, 0) ELSE 0 END), 0) AS ready_devices,
             SUM(CASE WHEN tb.tinh_trang_id <> 1 OR GREATEST(tb.tong_so_luong - ${borrowedQuantitySql}, 0) = 0 THEN 1 ELSE 0 END) AS maintenance_devices
           FROM thietbi tb
         `
