@@ -1,4 +1,4 @@
-import express from "express";
+﻿import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import crypto from "crypto";
@@ -40,7 +40,7 @@ function legacyGetMailerConfig() {
   const from = process.env.MAIL_FROM?.trim() || user;
 
   if (!host || !port || !user || !pass || !from) {
-    throw new Error("Chưa cấu hình SMTP để gửi mail OTP.");
+    throw new Error("ChÆ°a cáº¥u hÃ¬nh SMTP Ä‘á»ƒ gá»­i mail OTP.");
   }
 
   return {
@@ -66,19 +66,19 @@ async function legacySendPasswordResetOtpEmail(email, employeeName, otp) {
   await transporter.sendMail({
     from,
     to: email,
-    subject: "TechHUB - Mã OTP đặt lại mật khẩu",
-    text: `Xin chào ${employeeName}, mã OTP đặt lại mật khẩu của bạn là ${otp}. Mã có hiệu lực trong 10 phút.`,
+    subject: "TechHUB - MÃ£ OTP Ä‘áº·t láº¡i máº­t kháº©u",
+    text: `Xin chÃ o ${employeeName}, mÃ£ OTP Ä‘áº·t láº¡i máº­t kháº©u cá»§a báº¡n lÃ  ${otp}. MÃ£ cÃ³ hiá»‡u lá»±c trong 10 phÃºt.`,
     html: `
       <div style="font-family: Arial, Helvetica, sans-serif; color: #1f2937; line-height: 1.6;">
-        <h2 style="margin-bottom: 8px;">TechHUB - Đặt lại mật khẩu</h2>
-        <p>Xin chào <strong>${employeeName}</strong>,</p>
-        <p>Bạn vừa yêu cầu đặt lại mật khẩu cho tài khoản nhân viên.</p>
-        <p>Mã OTP của bạn là:</p>
+        <h2 style="margin-bottom: 8px;">TechHUB - Äáº·t láº¡i máº­t kháº©u</h2>
+        <p>Xin chÃ o <strong>${employeeName}</strong>,</p>
+        <p>Báº¡n vá»«a yÃªu cáº§u Ä‘áº·t láº¡i máº­t kháº©u cho tÃ i khoáº£n nhÃ¢n viÃªn.</p>
+        <p>MÃ£ OTP cá»§a báº¡n lÃ :</p>
         <div style="font-size: 28px; font-weight: 700; letter-spacing: 8px; color: #b42318; margin: 16px 0;">
           ${otp}
         </div>
-        <p>Mã này có hiệu lực trong <strong>10 phút</strong>.</p>
-        <p>Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email.</p>
+        <p>MÃ£ nÃ y cÃ³ hiá»‡u lá»±c trong <strong>10 phÃºt</strong>.</p>
+        <p>Náº¿u báº¡n khÃ´ng thá»±c hiá»‡n yÃªu cáº§u nÃ y, vui lÃ²ng bá» qua email.</p>
       </div>
     `,
   });
@@ -89,25 +89,25 @@ function legacyGetFriendlySmtpErrorMessage(error) {
   const normalized = message.toLowerCase();
 
   if (normalized.includes("timeout")) {
-    return "Hết thời gian kết nối khi gửi email. Vui lòng kiểm tra cấu hình máy chủ trên Railway.";
+    return "Háº¿t thá»i gian káº¿t ná»‘i khi gá»­i email. Vui lÃ²ng kiá»ƒm tra cáº¥u hÃ¬nh mÃ¡y chá»§ trÃªn Railway.";
   }
 
   if (normalized.includes("auth")) {
-    return "Máy chủ email đang từ chối đăng nhập. Vui lòng kiểm tra lại tài khoản gửi thư.";
+    return "MÃ¡y chá»§ email Ä‘ang tá»« chá»‘i Ä‘Äƒng nháº­p. Vui lÃ²ng kiá»ƒm tra láº¡i tÃ i khoáº£n gá»­i thÆ°.";
   }
 
   if (normalized.includes("smtp")) {
     return message;
   }
 
-  return message || "Không thể gửi mã OTP.";
+  return message || "KhÃ´ng thá»ƒ gá»­i mÃ£ OTP.";
 }
 
 function parseMailFrom(value = "") {
   const trimmedValue = value.trim();
 
   if (!trimmedValue) {
-    throw new Error("Chưa cấu hình MAIL_FROM trên Railway.");
+    throw new Error("ChÆ°a cáº¥u hÃ¬nh MAIL_FROM trÃªn Railway.");
   }
 
   const matchedSender = trimmedValue.match(/^(.*)<([^>]+)>$/);
@@ -129,22 +129,22 @@ async function sendPasswordResetOtpEmail(email, employeeName, otp) {
   const sender = parseMailFrom(process.env.MAIL_FROM?.trim() || "");
 
   if (!apiKey) {
-    throw new Error("Chưa cấu hình BREVO_API_KEY trên Railway.");
+    throw new Error("ChÆ°a cáº¥u hÃ¬nh BREVO_API_KEY trÃªn Railway.");
   }
 
-  const subject = "TechHUB - Mã OTP đặt lại mật khẩu";
-  const textContent = `Xin chào ${employeeName}, mã OTP đặt lại mật khẩu của bạn là ${otp}. Mã có hiệu lực trong 10 phút.`;
+  const subject = "TechHUB - MÃ£ OTP Ä‘áº·t láº¡i máº­t kháº©u";
+  const textContent = `Xin chÃ o ${employeeName}, mÃ£ OTP Ä‘áº·t láº¡i máº­t kháº©u cá»§a báº¡n lÃ  ${otp}. MÃ£ cÃ³ hiá»‡u lá»±c trong 10 phÃºt.`;
   const htmlContent = `
     <div style="font-family: Arial, Helvetica, sans-serif; color: #1f2937; line-height: 1.6;">
-      <h2 style="margin-bottom: 8px;">TechHUB - Đặt lại mật khẩu</h2>
-      <p>Xin chào <strong>${employeeName}</strong>,</p>
-      <p>Bạn vừa yêu cầu đặt lại mật khẩu cho tài khoản nhân viên.</p>
-      <p>Mã OTP của bạn là:</p>
+      <h2 style="margin-bottom: 8px;">TechHUB - Äáº·t láº¡i máº­t kháº©u</h2>
+      <p>Xin chÃ o <strong>${employeeName}</strong>,</p>
+      <p>Báº¡n vá»«a yÃªu cáº§u Ä‘áº·t láº¡i máº­t kháº©u cho tÃ i khoáº£n nhÃ¢n viÃªn.</p>
+      <p>MÃ£ OTP cá»§a báº¡n lÃ :</p>
       <div style="font-size: 28px; font-weight: 700; letter-spacing: 8px; color: #b42318; margin: 16px 0;">
         ${otp}
       </div>
-      <p>Mã này có hiệu lực trong <strong>10 phút</strong>.</p>
-      <p>Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email.</p>
+      <p>MÃ£ nÃ y cÃ³ hiá»‡u lá»±c trong <strong>10 phÃºt</strong>.</p>
+      <p>Náº¿u báº¡n khÃ´ng thá»±c hiá»‡n yÃªu cáº§u nÃ y, vui lÃ²ng bá» qua email.</p>
     </div>
   `;
 
@@ -175,19 +175,19 @@ function getFriendlySmtpErrorMessage(error) {
   const normalized = message.toLowerCase();
 
   if (normalized.includes("brevo_api_key")) {
-    return "Railway chưa có BREVO_API_KEY để gửi email OTP.";
+    return "Railway chÆ°a cÃ³ BREVO_API_KEY Ä‘á»ƒ gá»­i email OTP.";
   }
 
   if (normalized.includes("mail_from")) {
-    return "Railway chưa cấu hình MAIL_FROM hợp lệ cho Brevo.";
+    return "Railway chÆ°a cáº¥u hÃ¬nh MAIL_FROM há»£p lá»‡ cho Brevo.";
   }
 
   if (normalized.includes("unauthorized") || normalized.includes("invalid api key")) {
-    return "BREVO_API_KEY không hợp lệ. Vui lòng tạo API key mới trong Brevo.";
+    return "BREVO_API_KEY khÃ´ng há»£p lá»‡. Vui lÃ²ng táº¡o API key má»›i trong Brevo.";
   }
 
   if (normalized.includes("sender")) {
-    return "Email gửi chưa được xác minh trên Brevo. Vui lòng vào Senders để xác minh MAIL_FROM.";
+    return "Email gá»­i chÆ°a Ä‘Æ°á»£c xÃ¡c minh trÃªn Brevo. Vui lÃ²ng vÃ o Senders Ä‘á»ƒ xÃ¡c minh MAIL_FROM.";
   }
 
   if (normalized.includes("brevo api error")) {
@@ -195,10 +195,10 @@ function getFriendlySmtpErrorMessage(error) {
   }
 
   if (normalized.includes("timeout") || normalized.includes("fetch failed")) {
-    return "Máy chủ Railway không kết nối được tới Brevo API. Vui lòng redeploy lại và thử lại sau.";
+    return "MÃ¡y chá»§ Railway khÃ´ng káº¿t ná»‘i Ä‘Æ°á»£c tá»›i Brevo API. Vui lÃ²ng redeploy láº¡i vÃ  thá»­ láº¡i sau.";
   }
 
-  return message || "Không thể gửi mã OTP qua Brevo.";
+  return message || "KhÃ´ng thá»ƒ gá»­i mÃ£ OTP qua Brevo.";
 }
 
 async function resolveDeviceImageColumn() {
@@ -249,8 +249,8 @@ function normalizeText(value = "") {
   return value
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
-    .replace(/Đ/g, "D")
+    .replace(/Ä‘/g, "d")
+    .replace(/Ä/g, "D")
     .toLowerCase();
 }
 
@@ -260,6 +260,24 @@ function normalizeEmployeeCode(value = "") {
 
   const normalizedValue = rawValue.startsWith("NV") ? rawValue.slice(2) : rawValue;
   return `NV${normalizedValue.trim()}`;
+}
+
+function formatDeviceStatusName(value = "") {
+  const normalizedValue = normalizeText(value);
+
+  if (normalizedValue === "tot") {
+    return "Tá»‘t";
+  }
+
+  if (normalizedValue === "hong") {
+    return "Há»ng";
+  }
+
+  if (normalizedValue === "dang bao tri") {
+    return "Äang báº£o trÃ¬";
+  }
+
+  return value;
 }
 
 function getBorrowedQuantitySql(alias) {
@@ -314,7 +332,7 @@ function mapDevice(row) {
   const availableQuantity = Number(row.available_quantity ?? totalQuantity);
   const isMaintenance = normalizedStatus !== "tot";
   const isBorrowedOut = !isMaintenance && borrowedQuantity > 0 && availableQuantity === 0;
-  const statusLabel = isMaintenance ? "Cần bảo trì" : isBorrowedOut ? "Đang mượn" : "Sẵn sàng";
+  const statusLabel = isMaintenance ? "Cáº§n báº£o trÃ¬" : isBorrowedOut ? "Äang mÆ°á»£n" : "Sáºµn sÃ ng";
 
   return {
     id: row.id,
@@ -328,13 +346,13 @@ function mapDevice(row) {
     typeId: row.type_id,
     typeName: row.type_name,
     statusId: row.status_id,
-    statusName: row.status_name,
+    statusName: formatDeviceStatusName(row.status_name),
     totalQuantity,
     borrowedQuantity,
     availableQuantity,
     statusLabel,
     isAvailable: !isMaintenance && availableQuantity > 0,
-    description: row.description || `${row.name} thuộc nhóm ${row.type_name}.`,
+    description: row.description || `${row.name} thuá»™c nhÃ³m ${row.type_name}.`,
   };
 }
 
@@ -345,7 +363,7 @@ function mapEmployee(row) {
     username: row.username,
     email: row.email,
     role: Number(row.role),
-    roleLabel: Number(row.role) === 0 ? "Quan tri vien" : "Nhan vien",
+    roleLabel: Number(row.role) === 0 ? "Quáº£n trá»‹ viÃªn" : "NhÃ¢n viÃªn",
     employeeCode: row.employee_code,
   };
 }
@@ -368,25 +386,25 @@ function normalizeDevicePayload(body = {}) {
 
 async function validateDevicePayload(payload, deviceId = null) {
   if (!payload.code || !payload.name || !payload.typeId || !payload.statusId || !payload.totalQuantity) {
-    throw new Error("Vui long nhap day du thong tin thiet bi.");
+    throw new Error("Vui lÃ²ng nháº­p Ä‘áº§y Ä‘á»§ thÃ´ng tin thiáº¿t bá»‹.");
   }
 
   if (Number.isNaN(payload.typeId) || Number.isNaN(payload.statusId) || Number.isNaN(payload.totalQuantity)) {
-    throw new Error("Du lieu thiet bi khong hop le.");
+    throw new Error("Dá»¯ liá»‡u thiáº¿t bá»‹ khÃ´ng há»£p lá»‡.");
   }
 
   if (payload.totalQuantity < 1) {
-    throw new Error("Tong so luong thiet bi phai lon hon 0.");
+    throw new Error("Tá»•ng sá»‘ lÆ°á»£ng thiáº¿t bá»‹ pháº£i lá»›n hÆ¡n 0.");
   }
 
   const typeRows = await query(`SELECT id FROM loaithietbi WHERE id = ? LIMIT 1`, [payload.typeId]);
   if (!typeRows.length) {
-    throw new Error("Danh muc thiet bi khong ton tai.");
+    throw new Error("Danh má»¥c thiáº¿t bá»‹ khÃ´ng tá»“n táº¡i.");
   }
 
   const statusRows = await query(`SELECT id FROM tinhtrangthietbi WHERE id = ? LIMIT 1`, [payload.statusId]);
   if (!statusRows.length) {
-    throw new Error("Trang thai thiet bi khong ton tai.");
+    throw new Error("Tráº¡ng thÃ¡i thiáº¿t bá»‹ khÃ´ng tá»“n táº¡i.");
   }
 
   const duplicateRows = await query(
@@ -401,7 +419,7 @@ async function validateDevicePayload(payload, deviceId = null) {
   );
 
   if (duplicateRows.length) {
-    throw new Error("Ma thiet bi hoac SKU da ton tai.");
+    throw new Error("MÃ£ thiáº¿t bá»‹ hoáº·c SKU Ä‘Ã£ tá»“n táº¡i.");
   }
 }
 
@@ -474,7 +492,7 @@ async function syncLoanSlipAfterFinePayment(connection, { loanSlipId, employeeId
   );
 
   if (!loanRows.length) {
-    throw new Error("Khong tim thay phieu muon lien quan.");
+    throw new Error("KhÃ´ng tÃ¬m tháº¥y phiáº¿u mÆ°á»£n liÃªn quan.");
   }
 
   if (loanRows[0].trang_thai !== "qua_han") {
@@ -634,7 +652,7 @@ function parseRestoreRows(fileName, content) {
     return parseExcelHtmlContent(content);
   }
 
-  throw new Error("Chi ho tro file CSV hoac XLS duoc xuat tu he thong.");
+  throw new Error("Chá»‰ há»— trá»£ file CSV hoáº·c XLS Ä‘Æ°á»£c xuáº¥t tá»« há»‡ thá»‘ng.");
 }
 
 function pickRowValue(row, keys) {
@@ -697,7 +715,7 @@ function parseDeviceSummary(summary) {
 async function getDefaultEmployeeId() {
   const rows = await query(`SELECT id FROM nhanvien ORDER BY id LIMIT 1`);
   if (!rows.length) {
-    throw new Error("Khong tim thay nhan vien nao de gan cho du lieu phuc hoi.");
+    throw new Error("KhÃ´ng tÃ¬m tháº¥y nhÃ¢n viÃªn nÃ o Ä‘á»ƒ gÃ¡n cho dá»¯ liá»‡u phá»¥c há»“i.");
   }
 
   return Number(rows[0].id);
@@ -706,7 +724,7 @@ async function getDefaultEmployeeId() {
 async function ensureDeviceTypeId(typeName) {
   const trimmedName = String(typeName || "").trim();
   if (!trimmedName) {
-    throw new Error("Khong xac dinh duoc danh muc thiet bi trong file phuc hoi.");
+    throw new Error("KhÃ´ng xÃ¡c Ä‘á»‹nh Ä‘Æ°á»£c danh má»¥c thiáº¿t bá»‹ trong file phá»¥c há»“i.");
   }
 
   const existingRows = await query(`SELECT id FROM loaithietbi WHERE ten_loai = ? LIMIT 1`, [trimmedName]);
@@ -850,7 +868,7 @@ async function buildBorrowerMap() {
 async function ensureBorrowerId(connection, borrowerName) {
   const trimmedBorrowerName = String(borrowerName || "").trim();
   if (!trimmedBorrowerName) {
-    throw new Error("Vui long nhap ten nguoi muon.");
+    throw new Error("Vui lÃ²ng nháº­p tÃªn ngÆ°á»i mÆ°á»£n.");
   }
 
   const [borrowerRows] = await connection.execute(`SELECT id, ten FROM nguoimuon`);
@@ -870,12 +888,12 @@ async function resolveBorrowerId(connection, borrowerId, borrowerName) {
   }
 
   if (!borrowerId) {
-    throw new Error("Vui long nhap day du thong tin phieu muon.");
+    throw new Error("Vui lÃ²ng nháº­p Ä‘áº§y Ä‘á»§ thÃ´ng tin phiáº¿u mÆ°á»£n.");
   }
 
   const [borrowerRows] = await connection.execute(`SELECT id FROM nguoimuon WHERE id = ? LIMIT 1`, [borrowerId]);
   if (!borrowerRows.length) {
-    throw new Error("Nguoi muon khong ton tai.");
+    throw new Error("NgÆ°á»i mÆ°á»£n khÃ´ng tá»“n táº¡i.");
   }
 
   return Number(borrowerRows[0].id);
@@ -1068,7 +1086,7 @@ async function handleLogin(req, res) {
     const password = source.password?.trim();
 
     if (!identifier || !password) {
-      return res.status(400).json({ message: "Vui lòng nhập tài khoản và mật khẩu." });
+      return res.status(400).json({ message: "Vui lÃ²ng nháº­p tÃ i khoáº£n vÃ  máº­t kháº©u." });
     }
 
     const rows = await query(
@@ -1089,17 +1107,17 @@ async function handleLogin(req, res) {
     );
 
     if (!rows.length) {
-      return res.status(401).json({ message: "Tài khoản không tồn tại." });
+      return res.status(401).json({ message: "TÃ i khoáº£n khÃ´ng tá»“n táº¡i." });
     }
 
     const employee = rows[0];
     if (String(employee.password_admin) !== String(password)) {
-      return res.status(401).json({ message: "Mật khẩu không đúng." });
+      return res.status(401).json({ message: "Máº­t kháº©u khÃ´ng Ä‘Ãºng." });
     }
 
-    return res.json({ message: "Đăng nhập thành công.", user: mapEmployee(employee) });
+    return res.json({ message: "ÄÄƒng nháº­p thÃ nh cÃ´ng.", user: mapEmployee(employee) });
   } catch (error) {
-    return res.status(500).json({ message: "Không thể đăng nhập.", error: error.message });
+    return res.status(500).json({ message: "KhÃ´ng thá»ƒ Ä‘Äƒng nháº­p.", error: error.message });
   }
 }
 
@@ -1111,7 +1129,7 @@ app.post("/api/auth/forgot-password/request", async (req, res) => {
     const email = req.body.email?.trim().toLowerCase();
 
     if (!email) {
-      return res.status(400).json({ message: "Vui lòng nhập email để nhận mã OTP." });
+      return res.status(400).json({ message: "Vui lÃ²ng nháº­p email Ä‘á»ƒ nháº­n mÃ£ OTP." });
     }
 
     const rows = await query(
@@ -1128,7 +1146,7 @@ app.post("/api/auth/forgot-password/request", async (req, res) => {
     );
 
     if (!rows.length) {
-      return res.status(404).json({ message: "Email này không tồn tại trong hệ thống." });
+      return res.status(404).json({ message: "Email nÃ y khÃ´ng tá»“n táº¡i trong há»‡ thá»‘ng." });
     }
 
     const employee = rows[0];
@@ -1143,7 +1161,7 @@ app.post("/api/auth/forgot-password/request", async (req, res) => {
     await sendPasswordResetOtpEmail(employee.email, employee.full_name, otp);
 
     return res.json({
-      message: "Đã gửi mã OTP qua email. Vui lòng kiểm tra hộp thư của bạn.",
+      message: "ÄÃ£ gá»­i mÃ£ OTP qua email. Vui lÃ²ng kiá»ƒm tra há»™p thÆ° cá»§a báº¡n.",
     });
   } catch (error) {
     const friendlyMessage = getFriendlySmtpErrorMessage(error);
@@ -1166,25 +1184,25 @@ app.post("/api/auth/forgot-password/reset", async (req, res) => {
     const newPassword = req.body.newPassword?.trim();
 
     if (!email || !otp || !newPassword) {
-      return res.status(400).json({ message: "Vui lòng nhập đầy đủ email, mã OTP và mật khẩu mới." });
+      return res.status(400).json({ message: "Vui lÃ²ng nháº­p Ä‘áº§y Ä‘á»§ email, mÃ£ OTP vÃ  máº­t kháº©u má»›i." });
     }
 
     if (newPassword.length < 6) {
-      return res.status(400).json({ message: "Mật khẩu mới phải có ít nhất 6 ký tự." });
+      return res.status(400).json({ message: "Máº­t kháº©u má»›i pháº£i cÃ³ Ã­t nháº¥t 6 kÃ½ tá»±." });
     }
 
     const otpRecord = passwordResetOtps.get(email);
     if (!otpRecord) {
-      return res.status(400).json({ message: "Mã OTP không tồn tại hoặc đã hết hạn." });
+      return res.status(400).json({ message: "MÃ£ OTP khÃ´ng tá»“n táº¡i hoáº·c Ä‘Ã£ háº¿t háº¡n." });
     }
 
     if (otpRecord.expiresAt < Date.now()) {
       passwordResetOtps.delete(email);
-      return res.status(400).json({ message: "Mã OTP đã hết hạn. Vui lòng yêu cầu mã mới." });
+      return res.status(400).json({ message: "MÃ£ OTP Ä‘Ã£ háº¿t háº¡n. Vui lÃ²ng yÃªu cáº§u mÃ£ má»›i." });
     }
 
     if (otpRecord.otpHash !== hashOtp(otp)) {
-      return res.status(400).json({ message: "Mã OTP không đúng." });
+      return res.status(400).json({ message: "MÃ£ OTP khÃ´ng Ä‘Ãºng." });
     }
 
     const rows = await query(`SELECT id FROM nhanvien WHERE id = ? AND LOWER(email) = ? LIMIT 1`, [
@@ -1194,15 +1212,15 @@ app.post("/api/auth/forgot-password/reset", async (req, res) => {
 
     if (!rows.length) {
       passwordResetOtps.delete(email);
-      return res.status(404).json({ message: "Không tìm thấy tài khoản cần đặt lại mật khẩu." });
+      return res.status(404).json({ message: "KhÃ´ng tÃ¬m tháº¥y tÃ i khoáº£n cáº§n Ä‘áº·t láº¡i máº­t kháº©u." });
     }
 
     await query(`UPDATE nhanvien SET password_admin = ? WHERE id = ?`, [newPassword, otpRecord.employeeId]);
     passwordResetOtps.delete(email);
 
-    return res.json({ message: "Đặt lại mật khẩu thành công. Bạn có thể đăng nhập lại ngay bây giờ." });
+    return res.json({ message: "Äáº·t láº¡i máº­t kháº©u thÃ nh cÃ´ng. Báº¡n cÃ³ thá»ƒ Ä‘Äƒng nháº­p láº¡i ngay bÃ¢y giá»." });
   } catch (error) {
-    return res.status(500).json({ message: "Không thể đặt lại mật khẩu.", error: error.message });
+    return res.status(500).json({ message: "KhÃ´ng thá»ƒ Ä‘áº·t láº¡i máº­t kháº©u.", error: error.message });
   }
 });
 
@@ -1235,7 +1253,7 @@ app.get("/api/employees", async (req, res) => {
 
     return res.json(rows.map(mapEmployee));
   } catch (error) {
-    return res.status(500).json({ message: "Khong lay duoc danh sach nhan vien.", error: error.message });
+    return res.status(500).json({ message: "KhÃ´ng láº¥y Ä‘Æ°á»£c danh sÃ¡ch nhÃ¢n viÃªn.", error: error.message });
   }
 });
 
@@ -1249,11 +1267,11 @@ app.post("/api/employees", async (req, res) => {
     const employeeCode = normalizeEmployeeCode(req.body.employeeCode || "");
 
     if (!fullName || !username || !password || !email || !employeeCode || Number.isNaN(role)) {
-      return res.status(400).json({ message: "Vui long nhap day du thong tin tai khoan." });
+      return res.status(400).json({ message: "Vui lÃ²ng nháº­p Ä‘áº§y Ä‘á»§ thÃ´ng tin tÃ i khoáº£n." });
     }
 
     if (role !== 1) {
-      return res.status(400).json({ message: "Chi duoc cap them tai khoan nhan vien." });
+      return res.status(400).json({ message: "Chá»‰ Ä‘Æ°á»£c cáº¥p thÃªm tÃ i khoáº£n nhÃ¢n viÃªn." });
     }
 
     const duplicatedRows = await query(
@@ -1267,7 +1285,7 @@ app.post("/api/employees", async (req, res) => {
     );
 
     if (duplicatedRows.length) {
-      return res.status(400).json({ message: "Username, email hoac ma nhan vien da ton tai." });
+      return res.status(400).json({ message: "Username, email hoáº·c mÃ£ nhÃ¢n viÃªn Ä‘Ã£ tá»“n táº¡i." });
     }
 
     await query(
@@ -1278,9 +1296,9 @@ app.post("/api/employees", async (req, res) => {
       [fullName, username, password, email, role, employeeCode]
     );
 
-    return res.status(201).json({ message: "Tao tai khoan thanh cong." });
+    return res.status(201).json({ message: "Táº¡o tÃ i khoáº£n thÃ nh cÃ´ng." });
   } catch (error) {
-    return res.status(500).json({ message: "Khong the tao tai khoan.", error: error.message });
+    return res.status(500).json({ message: "KhÃ´ng thá»ƒ táº¡o tÃ i khoáº£n.", error: error.message });
   }
 });
 
@@ -1303,12 +1321,12 @@ app.get("/api/employees/:id", async (req, res) => {
     );
 
     if (!rows.length) {
-      return res.status(404).json({ message: "Khong tim thay nhan vien." });
+      return res.status(404).json({ message: "KhÃ´ng tÃ¬m tháº¥y nhÃ¢n viÃªn." });
     }
 
     return res.json(mapEmployee(rows[0]));
   } catch (error) {
-    return res.status(500).json({ message: "Khong lay duoc thong tin tai khoan.", error: error.message });
+    return res.status(500).json({ message: "KhÃ´ng láº¥y Ä‘Æ°á»£c thÃ´ng tin tÃ i khoáº£n.", error: error.message });
   }
 });
 
@@ -1317,17 +1335,17 @@ app.delete("/api/employees/:id", async (req, res) => {
     const employeeId = Number(req.params.id);
 
     if (Number.isNaN(employeeId)) {
-      return res.status(400).json({ message: "ID nhan vien khong hop le." });
+      return res.status(400).json({ message: "ID nhÃ¢n viÃªn khÃ´ng há»£p lá»‡." });
     }
 
     const rows = await query(`SELECT id, role FROM nhanvien WHERE id = ? LIMIT 1`, [employeeId]);
 
     if (!rows.length) {
-      return res.status(404).json({ message: "Khong tim thay tai khoan can xoa." });
+      return res.status(404).json({ message: "KhÃ´ng tÃ¬m tháº¥y tÃ i khoáº£n cáº§n xÃ³a." });
     }
 
     if (Number(rows[0].role) === 0) {
-      return res.status(400).json({ message: "Khong duoc xoa tai khoan quan tri." });
+      return res.status(400).json({ message: "KhÃ´ng Ä‘Æ°á»£c xÃ³a tÃ i khoáº£n quáº£n trá»‹." });
     }
 
     const [loanRows, fineRows] = await Promise.all([
@@ -1337,14 +1355,14 @@ app.delete("/api/employees/:id", async (req, res) => {
 
     if (Number(loanRows[0]?.total || 0) > 0 || Number(fineRows[0]?.total || 0) > 0) {
       return res.status(400).json({
-        message: "Tai khoan nay da duoc su dung trong phieu muon hoac phieu phat, khong the xoa.",
+        message: "TÃ i khoáº£n nÃ y Ä‘Ã£ Ä‘Æ°á»£c sá»­ dá»¥ng trong phiáº¿u mÆ°á»£n hoáº·c phiáº¿u pháº¡t, khÃ´ng thá»ƒ xÃ³a.",
       });
     }
 
     await query(`DELETE FROM nhanvien WHERE id = ?`, [employeeId]);
-    return res.json({ message: "Da xoa tai khoan nhan vien thanh cong." });
+    return res.json({ message: "ÄÃ£ xÃ³a tÃ i khoáº£n nhÃ¢n viÃªn thÃ nh cÃ´ng." });
   } catch (error) {
-    return res.status(500).json({ message: "Khong the xoa tai khoan.", error: error.message });
+    return res.status(500).json({ message: "KhÃ´ng thá»ƒ xÃ³a tÃ i khoáº£n.", error: error.message });
   }
 });
 
@@ -1355,23 +1373,23 @@ app.put("/api/employees/:id/password", async (req, res) => {
     const newPassword = req.body.newPassword?.trim();
 
     if (!currentPassword || !newPassword) {
-      return res.status(400).json({ message: "Vui long nhap du mat khau hien tai va mat khau moi." });
+      return res.status(400).json({ message: "Vui lÃ²ng nháº­p Ä‘á»§ máº­t kháº©u hiá»‡n táº¡i vÃ  máº­t kháº©u má»›i." });
     }
 
     const rows = await query(`SELECT id, password_admin FROM nhanvien WHERE id = ? LIMIT 1`, [employeeId]);
 
     if (!rows.length) {
-      return res.status(404).json({ message: "Khong tim thay nhan vien." });
+      return res.status(404).json({ message: "KhÃ´ng tÃ¬m tháº¥y nhÃ¢n viÃªn." });
     }
 
     if (String(rows[0].password_admin) !== String(currentPassword)) {
-      return res.status(400).json({ message: "Mat khau hien tai khong dung." });
+      return res.status(400).json({ message: "Máº­t kháº©u hiá»‡n táº¡i khÃ´ng Ä‘Ãºng." });
     }
 
     await query(`UPDATE nhanvien SET password_admin = ? WHERE id = ?`, [newPassword, employeeId]);
-    return res.json({ message: "Doi mat khau thanh cong." });
+    return res.json({ message: "Äá»•i máº­t kháº©u thÃ nh cÃ´ng." });
   } catch (error) {
-    return res.status(500).json({ message: "Khong the doi mat khau.", error: error.message });
+    return res.status(500).json({ message: "KhÃ´ng thá»ƒ Ä‘á»•i máº­t kháº©u.", error: error.message });
   }
 });
 
@@ -1387,7 +1405,7 @@ app.get("/api/borrowers", async (_req, res) => {
 
     res.json(rows);
   } catch (error) {
-    res.status(500).json({ message: "Khong lay duoc danh sach nguoi muon.", error: error.message });
+    res.status(500).json({ message: "KhÃ´ng láº¥y Ä‘Æ°á»£c danh sÃ¡ch ngÆ°á»i mÆ°á»£n.", error: error.message });
   }
 });
 
@@ -1408,7 +1426,7 @@ app.get("/api/device-types", async (_req, res) => {
 
     res.json(rows);
   } catch (error) {
-    res.status(500).json({ message: "Khong lay duoc loai thiet bi", error: error.message });
+    res.status(500).json({ message: "KhÃ´ng láº¥y Ä‘Æ°á»£c loáº¡i thiáº¿t bá»‹.", error: error.message });
   }
 });
 
@@ -1422,9 +1440,9 @@ app.get("/api/device-statuses", async (_req, res) => {
       `
     );
 
-    res.json(rows);
+    res.json(rows.map((row) => ({ ...row, name: formatDeviceStatusName(row.name) })));
   } catch (error) {
-    res.status(500).json({ message: "Khong lay duoc trang thai thiet bi", error: error.message });
+    res.status(500).json({ message: "KhÃ´ng láº¥y Ä‘Æ°á»£c tráº¡ng thÃ¡i thiáº¿t bá»‹.", error: error.message });
   }
 });
 
@@ -1476,7 +1494,7 @@ app.get("/api/dashboard/summary", async (_req, res) => {
       deviceTypeStats: typeRows.map((row) => ({ label: row.label, total: Number(row.total || 0) })),
     });
   } catch (error) {
-    res.status(500).json({ message: "Khong lay duoc du lieu dashboard.", error: error.message });
+    res.status(500).json({ message: "KhÃ´ng láº¥y Ä‘Æ°á»£c dá»¯ liá»‡u dashboard.", error: error.message });
   }
 });
 
@@ -1506,7 +1524,7 @@ app.get("/api/devices", async (req, res) => {
     const rows = await query(buildDeviceSelectSql(filters.length ? `WHERE ${filters.join(" AND ")}` : ""), params);
     res.json(rows.map(mapDevice));
   } catch (error) {
-    res.status(500).json({ message: "Khong lay duoc danh sach thiet bi", error: error.message });
+    res.status(500).json({ message: "KhÃ´ng láº¥y Ä‘Æ°á»£c danh sÃ¡ch thiáº¿t bá»‹.", error: error.message });
   }
 });
 
@@ -1547,9 +1565,9 @@ app.post("/api/devices", async (req, res) => {
       ]
     );
 
-    return res.status(201).json({ message: "Them thiet bi thanh cong.", id: result.insertId });
+    return res.status(201).json({ message: "ThÃªm thiáº¿t bá»‹ thÃ nh cÃ´ng.", id: result.insertId });
   } catch (error) {
-    return res.status(500).json({ message: error.message || "Khong the them thiet bi.", error: error.message });
+    return res.status(500).json({ message: error.message || "KhÃ´ng thá»ƒ thÃªm thiáº¿t bá»‹.", error: error.message });
   }
 });
 
@@ -1559,7 +1577,7 @@ app.get("/api/devices/:id", async (req, res) => {
     const rows = await query(buildDeviceSelectSql("WHERE tb.id = ?", "", "LIMIT 1"), [deviceId]);
 
     if (!rows.length) {
-      return res.status(404).json({ message: "Khong tim thay thiet bi" });
+      return res.status(404).json({ message: "KhÃ´ng tÃ¬m tháº¥y thiáº¿t bá»‹." });
     }
 
     const device = mapDevice(rows[0]);
@@ -1570,7 +1588,7 @@ app.get("/api/devices/:id", async (req, res) => {
 
     return res.json({ ...device, relatedDevices: relatedRows.map(mapDevice) });
   } catch (error) {
-    return res.status(500).json({ message: "Khong lay duoc chi tiet thiet bi", error: error.message });
+    return res.status(500).json({ message: "KhÃ´ng láº¥y Ä‘Æ°á»£c chi tiáº¿t thiáº¿t bá»‹.", error: error.message });
   }
 });
 
@@ -1581,7 +1599,7 @@ app.put("/api/devices/:id", async (req, res) => {
 
     const existingRows = await query(buildDeviceSelectSql("WHERE tb.id = ?", "", "LIMIT 1"), [deviceId]);
     if (!existingRows.length) {
-      return res.status(404).json({ message: "Khong tim thay thiet bi." });
+      return res.status(404).json({ message: "KhÃ´ng tÃ¬m tháº¥y thiáº¿t bá»‹." });
     }
 
     const existingDevice = mapDevice(existingRows[0]);
@@ -1599,7 +1617,7 @@ app.put("/api/devices/:id", async (req, res) => {
 
     if (payload.totalQuantity < borrowedQuantity) {
       return res.status(400).json({
-        message: `Khong the giam tong so luong nho hon so dang muon (${borrowedQuantity}).`,
+        message: `KhÃ´ng thá»ƒ giáº£m tá»•ng sá»‘ lÆ°á»£ng nhá» hÆ¡n sá»‘ Ä‘ang mÆ°á»£n (${borrowedQuantity}).`,
       });
     }
 
@@ -1641,11 +1659,11 @@ app.put("/api/devices/:id", async (req, res) => {
     return res.json({
       message:
         existingDevice.totalQuantity !== payload.totalQuantity
-          ? "Cap nhat thiet bi thanh cong va da dieu chinh so luong ton kho."
-          : "Cap nhat thiet bi thanh cong.",
+          ? "Cáº­p nháº­t thiáº¿t bá»‹ thÃ nh cÃ´ng vÃ  Ä‘Ã£ Ä‘iá»u chá»‰nh sá»‘ lÆ°á»£ng tá»“n kho."
+          : "Cáº­p nháº­t thiáº¿t bá»‹ thÃ nh cÃ´ng.",
     });
   } catch (error) {
-    return res.status(500).json({ message: error.message || "Khong the cap nhat thiet bi.", error: error.message });
+    return res.status(500).json({ message: error.message || "KhÃ´ng thá»ƒ cáº­p nháº­t thiáº¿t bá»‹.", error: error.message });
   }
 });
 
@@ -1655,7 +1673,7 @@ app.delete("/api/devices/:id", async (req, res) => {
 
     const rows = await query(`SELECT id, ten FROM thietbi WHERE id = ? LIMIT 1`, [deviceId]);
     if (!rows.length) {
-      return res.status(404).json({ message: "Khong tim thay thiet bi." });
+      return res.status(404).json({ message: "KhÃ´ng tÃ¬m tháº¥y thiáº¿t bá»‹." });
     }
 
     const activeBorrowRows = await query(
@@ -1670,18 +1688,18 @@ app.delete("/api/devices/:id", async (req, res) => {
     );
 
     if (Number(activeBorrowRows[0]?.borrowed_quantity || 0) > 0) {
-      return res.status(400).json({ message: "Thiet bi dang nam trong phieu muon, khong the xoa." });
+      return res.status(400).json({ message: "Thiáº¿t bá»‹ Ä‘ang náº±m trong phiáº¿u mÆ°á»£n, khÃ´ng thá»ƒ xÃ³a." });
     }
 
     const historyRows = await query(`SELECT phieu_muon_id FROM chitietphieumuon WHERE thiet_bi_id = ? LIMIT 1`, [deviceId]);
     if (historyRows.length) {
-      return res.status(400).json({ message: "Thiet bi da co lich su phieu muon, khong the xoa." });
+      return res.status(400).json({ message: "Thiáº¿t bá»‹ Ä‘Ã£ cÃ³ lá»‹ch sá»­ phiáº¿u mÆ°á»£n, khÃ´ng thá»ƒ xÃ³a." });
     }
 
     await query(`DELETE FROM thietbi WHERE id = ?`, [deviceId]);
-    return res.json({ message: "Xoa thiet bi thanh cong." });
+    return res.json({ message: "XÃ³a thiáº¿t bá»‹ thÃ nh cÃ´ng." });
   } catch (error) {
-    return res.status(500).json({ message: error.message || "Khong the xoa thiet bi.", error: error.message });
+    return res.status(500).json({ message: error.message || "KhÃ´ng thá»ƒ xÃ³a thiáº¿t bá»‹.", error: error.message });
   }
 });
 
@@ -1726,7 +1744,7 @@ app.get("/api/loan-slips", async (req, res) => {
 
     res.json(rows.map(mapLoanSlip));
   } catch (error) {
-    res.status(500).json({ message: "Khong lay duoc danh sach phieu muon.", error: error.message });
+    res.status(500).json({ message: "KhÃ´ng láº¥y Ä‘Æ°á»£c danh sÃ¡ch phiáº¿u mÆ°á»£n.", error: error.message });
   }
 });
 
@@ -1740,7 +1758,7 @@ app.post("/api/loan-slips", async (req, res) => {
   const items = Array.isArray(req.body.items) ? req.body.items : [];
 
   if ((!borrowerId && !borrowerName) || !employeeId || !borrowDate || !dueDate || !items.length) {
-    return res.status(400).json({ message: "Vui long nhap day du thong tin phieu muon." });
+    return res.status(400).json({ message: "Vui lÃ²ng nháº­p Ä‘áº§y Ä‘á»§ thÃ´ng tin phiáº¿u mÆ°á»£n." });
   }
 
   const normalizedItems = items
@@ -1748,12 +1766,12 @@ app.post("/api/loan-slips", async (req, res) => {
     .filter((item) => item.deviceId && item.quantity > 0);
 
   if (!normalizedItems.length) {
-    return res.status(400).json({ message: "Phieu muon can it nhat mot thiet bi hop le." });
+    return res.status(400).json({ message: "Phiáº¿u mÆ°á»£n cáº§n Ã­t nháº¥t má»™t thiáº¿t bá»‹ há»£p lá»‡." });
   }
 
   const uniqueDeviceIds = [...new Set(normalizedItems.map((item) => item.deviceId))];
   if (uniqueDeviceIds.length !== normalizedItems.length) {
-    return res.status(400).json({ message: "Moi thiet bi chi nen xuat hien mot lan trong phieu." });
+    return res.status(400).json({ message: "Má»—i thiáº¿t bá»‹ chá»‰ nÃªn xuáº¥t hiá»‡n má»™t láº§n trong phiáº¿u." });
   }
 
   const connection = await getConnection();
@@ -1773,15 +1791,15 @@ app.post("/api/loan-slips", async (req, res) => {
       const matchedDevice = deviceMap.get(item.deviceId);
 
       if (!matchedDevice) {
-        throw new Error("Co thiet bi khong ton tai trong he thong.");
+        throw new Error("CÃ³ thiáº¿t bá»‹ khÃ´ng tá»“n táº¡i trong há»‡ thá»‘ng.");
       }
 
       if (!matchedDevice.isAvailable) {
-        throw new Error(`Thiet bi "${matchedDevice.name}" hien khong san sang de muon.`);
+        throw new Error(`Thiáº¿t bá»‹ "${matchedDevice.name}" hiá»‡n khÃ´ng sáºµn sÃ ng Ä‘á»ƒ mÆ°á»£n.`);
       }
 
       if (item.quantity > matchedDevice.availableQuantity) {
-        throw new Error(`So luong muon cua "${matchedDevice.name}" vuot qua so luong con trong (${matchedDevice.availableQuantity}).`);
+        throw new Error(`Sá»‘ lÆ°á»£ng mÆ°á»£n cá»§a "${matchedDevice.name}" vÆ°á»£t quÃ¡ sá»‘ lÆ°á»£ng cÃ²n trong (${matchedDevice.availableQuantity}).`);
       }
     }
 
@@ -1808,10 +1826,10 @@ app.post("/api/loan-slips", async (req, res) => {
     }
 
     await connection.commit();
-    return res.status(201).json({ message: "Lap phieu muon thanh cong.", id: slipResult.insertId });
+    return res.status(201).json({ message: "Láº­p phiáº¿u mÆ°á»£n thÃ nh cÃ´ng.", id: slipResult.insertId });
   } catch (error) {
     await connection.rollback();
-    return res.status(500).json({ message: error.message || "Khong the lap phieu muon.", error: error.message });
+    return res.status(500).json({ message: error.message || "KhÃ´ng thá»ƒ láº­p phiáº¿u mÆ°á»£n.", error: error.message });
   } finally {
     connection.release();
   }
@@ -1825,11 +1843,11 @@ app.put("/api/loan-slips/:id/status", async (req, res) => {
   const returnDate = req.body.returnDate?.trim() || new Date().toISOString().slice(0, 10);
 
   if (!slipId || !employeeId || !status) {
-    return res.status(400).json({ message: "Vui long nhap day du thong tin cap nhat phiếu muon." });
+    return res.status(400).json({ message: "Vui lòng nhập đầy đủ thông tin cập nhật phiếu mượn." });
   }
 
   if (!["da_tra", "hong_hoc", "qua_han"].includes(status)) {
-    return res.status(400).json({ message: "Trang thai cap nhat khong hop le." });
+    return res.status(400).json({ message: "Trạng thái cập nhật không hợp lệ." });
   }
 
   const connection = await getConnection();
@@ -1848,12 +1866,12 @@ app.put("/api/loan-slips/:id/status", async (req, res) => {
     );
 
     if (!slipRows.length) {
-      throw new Error("Khong tim thay phieu muon.");
+      throw new Error("Không tìm thấy phiếu mượn.");
     }
 
     const currentStatus = slipRows[0].trang_thai;
     if (["da_tra", "hong_hoc"].includes(currentStatus)) {
-      throw new Error("Phieu muon nay da duoc xac nhan tra.");
+      throw new Error("Phiếu mượn này đã được xác nhận trả.");
     }
 
     const [loanItems] = await connection.execute(
@@ -1914,19 +1932,19 @@ app.put("/api/loan-slips/:id/status", async (req, res) => {
 
     await connection.commit();
     if (status === "da_tra") {
-      return res.json({ message: "Cap nhat phieu muon sang da tra thanh cong." });
+      return res.json({ message: "Cập nhật phiếu mượn sang đã trả thành công." });
     }
 
     if (status === "qua_han") {
-      return res.json({ message: "Da danh dau phieu muon qua han va tiep tuc giu thiet bi." });
+      return res.json({ message: "Đã đánh dấu phiếu mượn quá hạn và tiếp tục giữ thiết bị." });
     }
 
     return res.json({
-      message: status === "da_tra" ? "Cap nhat phiếu muon sang da tra thanh cong." : "Da ghi nhan phieu muon hong hoc.",
+      message: status === "da_tra" ? "Cập nhật phiếu mượn sang đã trả thành công." : "Đã ghi nhận phiếu mượn hỏng hóc.",
     });
   } catch (error) {
     await connection.rollback();
-    return res.status(500).json({ message: error.message || "Khong the cap nhat phieu muon.", error: error.message });
+    return res.status(500).json({ message: error.message || "Không thể cập nhật phiếu mượn.", error: error.message });
   } finally {
     connection.release();
   }
@@ -1974,7 +1992,7 @@ app.get("/api/fine-slips", async (req, res) => {
 
     return res.json(rows.map(mapFineSlip));
   } catch (error) {
-    return res.status(500).json({ message: "Khong lay duoc danh sach phieu phat.", error: error.message });
+    return res.status(500).json({ message: "Không lấy được danh sách phiếu phạt.", error: error.message });
   }
 });
 
@@ -1993,7 +2011,7 @@ app.post("/api/fine-slips", async (req, res) => {
     const note = req.body.note?.trim() || null;
 
     if (!loanSlipId || !employeeId || !issuedDate || !fineType || Number.isNaN(amount)) {
-      return res.status(400).json({ message: "Vui long nhap day du thong tin phieu phat." });
+      return res.status(400).json({ message: "Vui lòng nhập đầy đủ thông tin phiếu phạt." });
     }
 
     await connection.beginTransaction();
@@ -2001,7 +2019,7 @@ app.post("/api/fine-slips", async (req, res) => {
     const [existingFineRows] = await connection.execute(`SELECT id FROM phieuphat WHERE phieu_muon_id = ? LIMIT 1`, [loanSlipId]);
     if (existingFineRows.length) {
       await connection.rollback();
-      return res.status(400).json({ message: "Phieu muon nay da duoc lap phieu phat." });
+      return res.status(400).json({ message: "Phiếu mượn này đã được lập phiếu phạt." });
     }
 
     await connection.execute(
@@ -2033,12 +2051,12 @@ app.post("/api/fine-slips", async (req, res) => {
 
     return res.status(201).json({
       message: didSyncLoanSlip
-        ? "Tao phieu phat thanh cong va da cap nhat phieu muon sang da tra."
-        : "Tao phieu phat thanh cong.",
+        ? "Tạo phiếu phạt thành công và đã cập nhật phiếu mượn sang đã trả."
+        : "Tạo phiếu phạt thành công.",
     });
   } catch (error) {
     await connection.rollback();
-    return res.status(500).json({ message: "Khong the tao phieu phat.", error: error.message });
+    return res.status(500).json({ message: "Không thể tạo phiếu phạt.", error: error.message });
   } finally {
     connection.release();
   }
@@ -2060,7 +2078,7 @@ app.put("/api/fine-slips/:id", async (req, res) => {
     const note = req.body.note?.trim() || null;
 
     if (!fineId || !loanSlipId || !employeeId || !issuedDate || !fineType || Number.isNaN(amount)) {
-      return res.status(400).json({ message: "Vui long nhap day du thong tin phieu phat." });
+      return res.status(400).json({ message: "Vui lòng nhập đầy đủ thông tin phiếu phạt." });
     }
 
     await connection.beginTransaction();
@@ -2068,7 +2086,7 @@ app.put("/api/fine-slips/:id", async (req, res) => {
     const [existingRows] = await connection.execute(`SELECT id FROM phieuphat WHERE id = ? LIMIT 1`, [fineId]);
     if (!existingRows.length) {
       await connection.rollback();
-      return res.status(404).json({ message: "Khong tim thay phieu phat." });
+      return res.status(404).json({ message: "Không tìm thấy phiếu phạt." });
     }
 
     const [duplicateLoanSlipRows] = await connection.execute(
@@ -2077,7 +2095,7 @@ app.put("/api/fine-slips/:id", async (req, res) => {
     );
     if (duplicateLoanSlipRows.length) {
       await connection.rollback();
-      return res.status(400).json({ message: "Phieu muon nay da duoc lap phieu phat." });
+      return res.status(400).json({ message: "Phiếu mượn này đã được lập phiếu phạt." });
     }
 
     await connection.execute(
@@ -2109,12 +2127,12 @@ app.put("/api/fine-slips/:id", async (req, res) => {
 
     return res.json({
       message: didSyncLoanSlip
-        ? "Cap nhat phieu phat thanh cong va da cap nhat phieu muon sang da tra."
-        : "Cap nhat phieu phat thanh cong.",
+        ? "Cập nhật phiếu phạt thành công và đã cập nhật phiếu mượn sang đã trả."
+        : "Cập nhật phiếu phạt thành công.",
     });
   } catch (error) {
     await connection.rollback();
-    return res.status(500).json({ message: "Khong the cap nhat phieu phat.", error: error.message });
+    return res.status(500).json({ message: "Không thể cập nhật phiếu phạt.", error: error.message });
   } finally {
     connection.release();
   }
@@ -2125,13 +2143,13 @@ app.delete("/api/fine-slips/:id", async (req, res) => {
     const fineId = Number(req.params.id);
     const existingRows = await query(`SELECT id FROM phieuphat WHERE id = ? LIMIT 1`, [fineId]);
     if (!existingRows.length) {
-      return res.status(404).json({ message: "Khong tim thay phieu phat." });
+      return res.status(404).json({ message: "Không tìm thấy phiếu phạt." });
     }
 
     await query(`DELETE FROM phieuphat WHERE id = ?`, [fineId]);
-    return res.json({ message: "Xoa phieu phat thanh cong." });
+    return res.json({ message: "Xóa phiếu phạt thành công." });
   } catch (error) {
-    return res.status(500).json({ message: "Khong the xoa phieu phat.", error: error.message });
+    return res.status(500).json({ message: "Không thể xóa phiếu phạt.", error: error.message });
   }
 });
 
@@ -2142,12 +2160,12 @@ app.post("/api/restore", async (req, res) => {
     const content = req.body.content;
 
     if (!target || !fileName || typeof content !== "string") {
-      return res.status(400).json({ message: "Vui long gui day du muc phuc hoi va noi dung file." });
+      return res.status(400).json({ message: "Vui lòng gửi đầy đủ mục phục hồi và nội dung file." });
     }
 
     const rows = parseRestoreRows(fileName, content);
     if (!rows.length) {
-      return res.status(400).json({ message: "Khong doc duoc du lieu hop le tu file da chon." });
+      return res.status(400).json({ message: "Không đọc được dữ liệu hợp lệ từ file đã chọn." });
     }
 
     let restoredCount = 0;
@@ -2161,18 +2179,18 @@ app.post("/api/restore", async (req, res) => {
     } else if (target === "devices") {
       restoredCount = await restoreDevices(rows);
     } else {
-      return res.status(400).json({ message: "Loai du lieu phuc hoi khong hop le." });
+      return res.status(400).json({ message: "Loại dữ liệu phục hồi không hợp lệ." });
     }
 
     if (!restoredCount) {
       return res.status(400).json({
-        message: "Khong co dong nao duoc phuc hoi. Hay kiem tra dung file da xuat tu he thong va du lieu tham chieu hien co.",
+        message: "Không có dòng nào được phục hồi. Hãy kiểm tra đúng file đã xuất từ hệ thống và dữ liệu tham chiếu hiện có.",
       });
     }
 
-    return res.json({ message: `Phuc hoi thanh cong ${restoredCount} dong du lieu cho muc ${target}.` });
+    return res.json({ message: `Phục hồi thành công ${restoredCount} dòng dữ liệu cho mục ${target}.` });
   } catch (error) {
-    return res.status(500).json({ message: error.message || "Khong the phuc hoi du lieu.", error: error.message });
+    return res.status(500).json({ message: error.message || "Không thể phục hồi dữ liệu.", error: error.message });
   }
 });
 
