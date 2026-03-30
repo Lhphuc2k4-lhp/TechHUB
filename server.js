@@ -89,25 +89,25 @@ function legacyGetFriendlySmtpErrorMessage(error) {
   const normalized = message.toLowerCase();
 
   if (normalized.includes("timeout")) {
-    return "Connection timeout khi ket noi SMTP. Vui long kiem tra SMTP_HOST, SMTP_PORT va SMTP_SECURE tren Railway.";
+    return "Hết thời gian kết nối khi gửi email. Vui lòng kiểm tra cấu hình máy chủ trên Railway.";
   }
 
   if (normalized.includes("auth")) {
-    return "SMTP dang tu choi dang nhap. Vui long kiem tra SMTP_USER va SMTP_PASS.";
+    return "Máy chủ email đang từ chối đăng nhập. Vui lòng kiểm tra lại tài khoản gửi thư.";
   }
 
   if (normalized.includes("smtp")) {
     return message;
   }
 
-  return message || "Khong the gui ma OTP.";
+  return message || "Không thể gửi mã OTP.";
 }
 
 function parseMailFrom(value = "") {
   const trimmedValue = value.trim();
 
   if (!trimmedValue) {
-    throw new Error("Chua cau hinh MAIL_FROM tren Railway.");
+    throw new Error("Chưa cấu hình MAIL_FROM trên Railway.");
   }
 
   const matchedSender = trimmedValue.match(/^(.*)<([^>]+)>$/);
@@ -129,22 +129,22 @@ async function sendPasswordResetOtpEmail(email, employeeName, otp) {
   const sender = parseMailFrom(process.env.MAIL_FROM?.trim() || "");
 
   if (!apiKey) {
-    throw new Error("Chua cau hinh BREVO_API_KEY tren Railway.");
+    throw new Error("Chưa cấu hình BREVO_API_KEY trên Railway.");
   }
 
-  const subject = "TechHUB - Ma OTP dat lai mat khau";
-  const textContent = `Xin chao ${employeeName}, ma OTP dat lai mat khau cua ban la ${otp}. Ma co hieu luc trong 10 phut.`;
+  const subject = "TechHUB - Mã OTP đặt lại mật khẩu";
+  const textContent = `Xin chào ${employeeName}, mã OTP đặt lại mật khẩu của bạn là ${otp}. Mã có hiệu lực trong 10 phút.`;
   const htmlContent = `
     <div style="font-family: Arial, Helvetica, sans-serif; color: #1f2937; line-height: 1.6;">
-      <h2 style="margin-bottom: 8px;">TechHUB - Dat lai mat khau</h2>
-      <p>Xin chao <strong>${employeeName}</strong>,</p>
-      <p>Ban vua yeu cau dat lai mat khau cho tai khoan nhan vien.</p>
-      <p>Ma OTP cua ban la:</p>
+      <h2 style="margin-bottom: 8px;">TechHUB - Đặt lại mật khẩu</h2>
+      <p>Xin chào <strong>${employeeName}</strong>,</p>
+      <p>Bạn vừa yêu cầu đặt lại mật khẩu cho tài khoản nhân viên.</p>
+      <p>Mã OTP của bạn là:</p>
       <div style="font-size: 28px; font-weight: 700; letter-spacing: 8px; color: #b42318; margin: 16px 0;">
         ${otp}
       </div>
-      <p>Ma nay co hieu luc trong <strong>10 phut</strong>.</p>
-      <p>Neu ban khong thuc hien yeu cau nay, vui long bo qua email.</p>
+      <p>Mã này có hiệu lực trong <strong>10 phút</strong>.</p>
+      <p>Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email.</p>
     </div>
   `;
 
@@ -175,19 +175,19 @@ function getFriendlySmtpErrorMessage(error) {
   const normalized = message.toLowerCase();
 
   if (normalized.includes("brevo_api_key")) {
-    return "Railway chua co BREVO_API_KEY de gui email OTP.";
+    return "Railway chưa có BREVO_API_KEY để gửi email OTP.";
   }
 
   if (normalized.includes("mail_from")) {
-    return "Railway chua cau hinh MAIL_FROM hop le cho Brevo.";
+    return "Railway chưa cấu hình MAIL_FROM hợp lệ cho Brevo.";
   }
 
   if (normalized.includes("unauthorized") || normalized.includes("invalid api key")) {
-    return "BREVO_API_KEY khong hop le. Vui long tao API key moi trong Brevo.";
+    return "BREVO_API_KEY không hợp lệ. Vui lòng tạo API key mới trong Brevo.";
   }
 
   if (normalized.includes("sender")) {
-    return "Email gui chua duoc xac minh tren Brevo. Vui long vao Senders de verify MAIL_FROM.";
+    return "Email gửi chưa được xác minh trên Brevo. Vui lòng vào Senders để xác minh MAIL_FROM.";
   }
 
   if (normalized.includes("brevo api error")) {
@@ -195,10 +195,10 @@ function getFriendlySmtpErrorMessage(error) {
   }
 
   if (normalized.includes("timeout") || normalized.includes("fetch failed")) {
-    return "Server Railway khong ket noi duoc toi Brevo API. Vui long redeploy lai va thu lai sau.";
+    return "Máy chủ Railway không kết nối được tới Brevo API. Vui lòng redeploy lại và thử lại sau.";
   }
 
-  return message || "Khong the gui ma OTP qua Brevo.";
+  return message || "Không thể gửi mã OTP qua Brevo.";
 }
 
 async function resolveDeviceImageColumn() {
@@ -270,7 +270,7 @@ function getBorrowedQuantitySql(alias) {
         FROM chitietphieumuon ctpm
         INNER JOIN phieumuon pm ON pm.id = ctpm.phieu_muon_id
         WHERE ctpm.thiet_bi_id = ${alias}.id
-          AND pm.trang_thai = 'dang_muon'
+          AND pm.trang_thai IN ('dang_muon', 'qua_han')
       ),
       0
     )
@@ -314,7 +314,7 @@ function mapDevice(row) {
   const availableQuantity = Number(row.available_quantity ?? totalQuantity);
   const isMaintenance = normalizedStatus !== "tot";
   const isBorrowedOut = !isMaintenance && borrowedQuantity > 0 && availableQuantity === 0;
-  const statusLabel = isMaintenance ? "Can bao tri" : isBorrowedOut ? "Dang muon" : "San sang";
+  const statusLabel = isMaintenance ? "Cần bảo trì" : isBorrowedOut ? "Đang mượn" : "Sẵn sàng";
 
   return {
     id: row.id,
@@ -334,7 +334,7 @@ function mapDevice(row) {
     availableQuantity,
     statusLabel,
     isAvailable: !isMaintenance && availableQuantity > 0,
-    description: row.description || `${row.name} thuoc nhom ${row.type_name}.`,
+    description: row.description || `${row.name} thuộc nhóm ${row.type_name}.`,
   };
 }
 
@@ -887,7 +887,7 @@ async function restoreLoanSlips(rows) {
         );
       }
 
-      if (status === "dang_muon") {
+      if (["dang_muon", "qua_han"].includes(status)) {
         await connection.execute(`DELETE FROM phieutra WHERE phieu_muon_id = ?`, [targetLoanId]);
       } else {
         const [returnRows] = await connection.execute(`SELECT id FROM phieutra WHERE phieu_muon_id = ? LIMIT 1`, [targetLoanId]);
@@ -1010,7 +1010,7 @@ async function handleLogin(req, res) {
     const password = source.password?.trim();
 
     if (!identifier || !password) {
-      return res.status(400).json({ message: "Vui long nhap tai khoan va mat khau." });
+      return res.status(400).json({ message: "Vui lòng nhập tài khoản và mật khẩu." });
     }
 
     const rows = await query(
@@ -1031,17 +1031,17 @@ async function handleLogin(req, res) {
     );
 
     if (!rows.length) {
-      return res.status(401).json({ message: "Tai khoan khong ton tai." });
+      return res.status(401).json({ message: "Tài khoản không tồn tại." });
     }
 
     const employee = rows[0];
     if (String(employee.password_admin) !== String(password)) {
-      return res.status(401).json({ message: "Mat khau khong dung." });
+      return res.status(401).json({ message: "Mật khẩu không đúng." });
     }
 
-    return res.json({ message: "Dang nhap thanh cong.", user: mapEmployee(employee) });
+    return res.json({ message: "Đăng nhập thành công.", user: mapEmployee(employee) });
   } catch (error) {
-    return res.status(500).json({ message: "Khong the dang nhap.", error: error.message });
+    return res.status(500).json({ message: "Không thể đăng nhập.", error: error.message });
   }
 }
 
@@ -1053,7 +1053,7 @@ app.post("/api/auth/forgot-password/request", async (req, res) => {
     const email = req.body.email?.trim().toLowerCase();
 
     if (!email) {
-      return res.status(400).json({ message: "Vui long nhap email de nhan ma OTP." });
+      return res.status(400).json({ message: "Vui lòng nhập email để nhận mã OTP." });
     }
 
     const rows = await query(
@@ -1070,7 +1070,7 @@ app.post("/api/auth/forgot-password/request", async (req, res) => {
     );
 
     if (!rows.length) {
-      return res.status(404).json({ message: "Email nay khong ton tai trong he thong." });
+      return res.status(404).json({ message: "Email này không tồn tại trong hệ thống." });
     }
 
     const employee = rows[0];
@@ -1085,7 +1085,7 @@ app.post("/api/auth/forgot-password/request", async (req, res) => {
     await sendPasswordResetOtpEmail(employee.email, employee.full_name, otp);
 
     return res.json({
-      message: "Da gui ma OTP qua email. Vui long kiem tra hop thu cua ban.",
+      message: "Đã gửi mã OTP qua email. Vui lòng kiểm tra hộp thư của bạn.",
     });
   } catch (error) {
     const friendlyMessage = getFriendlySmtpErrorMessage(error);
@@ -1108,25 +1108,25 @@ app.post("/api/auth/forgot-password/reset", async (req, res) => {
     const newPassword = req.body.newPassword?.trim();
 
     if (!email || !otp || !newPassword) {
-      return res.status(400).json({ message: "Vui long nhap day du email, ma OTP va mat khau moi." });
+      return res.status(400).json({ message: "Vui lòng nhập đầy đủ email, mã OTP và mật khẩu mới." });
     }
 
     if (newPassword.length < 6) {
-      return res.status(400).json({ message: "Mat khau moi phai co it nhat 6 ky tu." });
+      return res.status(400).json({ message: "Mật khẩu mới phải có ít nhất 6 ký tự." });
     }
 
     const otpRecord = passwordResetOtps.get(email);
     if (!otpRecord) {
-      return res.status(400).json({ message: "Ma OTP khong ton tai hoac da het han." });
+      return res.status(400).json({ message: "Mã OTP không tồn tại hoặc đã hết hạn." });
     }
 
     if (otpRecord.expiresAt < Date.now()) {
       passwordResetOtps.delete(email);
-      return res.status(400).json({ message: "Ma OTP da het han. Vui long yeu cau ma moi." });
+      return res.status(400).json({ message: "Mã OTP đã hết hạn. Vui lòng yêu cầu mã mới." });
     }
 
     if (otpRecord.otpHash !== hashOtp(otp)) {
-      return res.status(400).json({ message: "Ma OTP khong dung." });
+      return res.status(400).json({ message: "Mã OTP không đúng." });
     }
 
     const rows = await query(`SELECT id FROM nhanvien WHERE id = ? AND LOWER(email) = ? LIMIT 1`, [
@@ -1136,15 +1136,15 @@ app.post("/api/auth/forgot-password/reset", async (req, res) => {
 
     if (!rows.length) {
       passwordResetOtps.delete(email);
-      return res.status(404).json({ message: "Khong tim thay tai khoan can dat lai mat khau." });
+      return res.status(404).json({ message: "Không tìm thấy tài khoản cần đặt lại mật khẩu." });
     }
 
     await query(`UPDATE nhanvien SET password_admin = ? WHERE id = ?`, [newPassword, otpRecord.employeeId]);
     passwordResetOtps.delete(email);
 
-    return res.json({ message: "Dat lai mat khau thanh cong. Ban co the dang nhap lai ngay bay gio." });
+    return res.json({ message: "Đặt lại mật khẩu thành công. Bạn có thể đăng nhập lại ngay bây giờ." });
   } catch (error) {
-    return res.status(500).json({ message: "Khong the dat lai mat khau.", error: error.message });
+    return res.status(500).json({ message: "Không thể đặt lại mật khẩu.", error: error.message });
   }
 });
 
@@ -1533,7 +1533,7 @@ app.put("/api/devices/:id", async (req, res) => {
         FROM chitietphieumuon ctpm
         INNER JOIN phieumuon pm ON pm.id = ctpm.phieu_muon_id
         WHERE ctpm.thiet_bi_id = ?
-          AND pm.trang_thai = 'dang_muon'
+          AND pm.trang_thai IN ('dang_muon', 'qua_han')
       `,
       [deviceId]
     );
@@ -1606,7 +1606,7 @@ app.delete("/api/devices/:id", async (req, res) => {
         FROM chitietphieumuon ctpm
         INNER JOIN phieumuon pm ON pm.id = ctpm.phieu_muon_id
         WHERE ctpm.thiet_bi_id = ?
-          AND pm.trang_thai = 'dang_muon'
+          AND pm.trang_thai IN ('dang_muon', 'qua_han')
       `,
       [deviceId]
     );
@@ -1794,7 +1794,7 @@ app.put("/api/loan-slips/:id/status", async (req, res) => {
     }
 
     const currentStatus = slipRows[0].trang_thai;
-    if (currentStatus === "da_tra") {
+    if (["da_tra", "hong_hoc"].includes(currentStatus)) {
       throw new Error("Phieu muon nay da duoc xac nhan tra.");
     }
 
@@ -1809,33 +1809,37 @@ app.put("/api/loan-slips/:id/status", async (req, res) => {
 
     await connection.execute(`UPDATE phieumuon SET trang_thai = ?, ghi_chu = ? WHERE id = ?`, [status, note, slipId]);
 
-    const [existingReturnRows] = await connection.execute(
-      `
-        SELECT id
-        FROM phieutra
-        WHERE phieu_muon_id = ?
-        LIMIT 1
-      `,
-      [slipId]
-    );
-
-    if (existingReturnRows.length) {
-      await connection.execute(
-        `
-          UPDATE phieutra
-          SET nhan_vien_id = ?, ngay_tra = ?, tinh_trang_sau_khi_tra = ?, ghi_chu = ?
-          WHERE phieu_muon_id = ?
-        `,
-        [employeeId, returnDate, getReturnConditionLabel(status), note, slipId]
-      );
+    if (status === "qua_han") {
+      await connection.execute(`DELETE FROM phieutra WHERE phieu_muon_id = ?`, [slipId]);
     } else {
-      await connection.execute(
+      const [existingReturnRows] = await connection.execute(
         `
-          INSERT INTO phieutra (phieu_muon_id, nhan_vien_id, ngay_tra, tinh_trang_sau_khi_tra, ghi_chu)
-          VALUES (?, ?, ?, ?, ?)
+          SELECT id
+          FROM phieutra
+          WHERE phieu_muon_id = ?
+          LIMIT 1
         `,
-        [slipId, employeeId, returnDate, getReturnConditionLabel(status), note]
+        [slipId]
       );
+
+      if (existingReturnRows.length) {
+        await connection.execute(
+          `
+            UPDATE phieutra
+            SET nhan_vien_id = ?, ngay_tra = ?, tinh_trang_sau_khi_tra = ?, ghi_chu = ?
+            WHERE phieu_muon_id = ?
+          `,
+          [employeeId, returnDate, getReturnConditionLabel(status), note, slipId]
+        );
+      } else {
+        await connection.execute(
+          `
+            INSERT INTO phieutra (phieu_muon_id, nhan_vien_id, ngay_tra, tinh_trang_sau_khi_tra, ghi_chu)
+            VALUES (?, ?, ?, ?, ?)
+          `,
+          [slipId, employeeId, returnDate, getReturnConditionLabel(status), note]
+        );
+      }
     }
 
     if (status === "hong_hoc" && loanItems.length) {
@@ -1851,6 +1855,14 @@ app.put("/api/loan-slips/:id/status", async (req, res) => {
     }
 
     await connection.commit();
+    if (status === "da_tra") {
+      return res.json({ message: "Cap nhat phieu muon sang da tra thanh cong." });
+    }
+
+    if (status === "qua_han") {
+      return res.json({ message: "Da danh dau phieu muon qua han va tiep tuc giu thiet bi." });
+    }
+
     return res.json({
       message: status === "da_tra" ? "Cap nhat phiếu muon sang da tra thanh cong." : "Da ghi nhan phieu muon hong hoc.",
     });
