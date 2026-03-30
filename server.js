@@ -266,15 +266,15 @@ function formatDeviceStatusName(value = "") {
   const normalizedValue = normalizeText(value);
 
   if (normalizedValue === "tot") {
-    return "Tá»‘t";
+    return "Tốt";
   }
 
   if (normalizedValue === "hong") {
-    return "Há»ng";
+    return "Hỏng";
   }
 
   if (normalizedValue === "dang bao tri") {
-    return "Äang báº£o trÃ¬";
+    return "Đang bảo trì";
   }
 
   return value;
@@ -332,7 +332,7 @@ function mapDevice(row) {
   const availableQuantity = Number(row.available_quantity ?? totalQuantity);
   const isMaintenance = normalizedStatus !== "tot";
   const isBorrowedOut = !isMaintenance && borrowedQuantity > 0 && availableQuantity === 0;
-  const statusLabel = isMaintenance ? "Cáº§n báº£o trÃ¬" : isBorrowedOut ? "Äang mÆ°á»£n" : "Sáºµn sÃ ng";
+  const statusLabel = isMaintenance ? "Cần bảo trì" : isBorrowedOut ? "Đang mượn" : "Sẵn sàng";
 
   return {
     id: row.id,
