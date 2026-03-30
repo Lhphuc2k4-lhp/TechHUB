@@ -539,8 +539,9 @@ async function validateDevicePayload(payload, deviceId = null) {
 }
 
 function mapLoanSlip(row) {
-  const normalizedReturnCondition = normalizeText(row.return_condition || "");
-  let status = row.status;
+  const repairedRow = repairPayload(row);
+  const normalizedReturnCondition = normalizeText(repairedRow.return_condition || "");
+  let status = repairedRow.status;
 
   if (normalizedReturnCondition === "hong hoc" || normalizedReturnCondition === "hong_hoc") {
     status = "hong_hoc";
@@ -549,38 +550,40 @@ function mapLoanSlip(row) {
   }
 
   return {
-    id: row.id,
-    slipCode: `PM${String(row.id).padStart(3, "0")}`,
-    borrowerId: row.borrower_id,
-    borrowerName: row.borrower_name,
-    employeeId: row.employee_id,
-    employeeName: row.employee_name,
-    borrowDate: formatDateValue(row.borrow_date),
-    dueDate: formatDateValue(row.due_date),
+    id: repairedRow.id,
+    slipCode: `PM${String(repairedRow.id).padStart(3, "0")}`,
+    borrowerId: repairedRow.borrower_id,
+    borrowerName: repairedRow.borrower_name,
+    employeeId: repairedRow.employee_id,
+    employeeName: repairedRow.employee_name,
+    borrowDate: formatDateValue(repairedRow.borrow_date),
+    dueDate: formatDateValue(repairedRow.due_date),
     status,
-    note: row.note || "",
-    deviceSummary: row.device_summary || "",
-    totalItems: Number(row.total_items || 0),
+    note: repairedRow.note || "",
+    deviceSummary: repairedRow.device_summary || "",
+    totalItems: Number(repairedRow.total_items || 0),
   };
 }
 
 function mapFineSlip(row) {
+  const repairedRow = repairPayload(row);
+
   return {
-    id: row.id,
-    fineCode: `PP${String(row.id).padStart(3, "0")}`,
-    loanSlipId: row.loan_slip_id,
-    loanSlipCode: `PM${String(row.loan_slip_id).padStart(3, "0")}`,
-    borrowerName: row.borrower_name,
-    employeeId: row.employee_id,
-    employeeName: row.employee_name,
-    issuedDate: formatDateValue(row.issued_date),
-    fineType: row.fine_type,
-    amount: Number(row.amount || 0),
-    reason: row.reason || "",
-    paymentStatus: row.payment_status,
-    paymentDate: formatDateValue(row.payment_date),
-    note: row.note || "",
-    deviceSummary: row.device_summary || "",
+    id: repairedRow.id,
+    fineCode: `PP${String(repairedRow.id).padStart(3, "0")}`,
+    loanSlipId: repairedRow.loan_slip_id,
+    loanSlipCode: `PM${String(repairedRow.loan_slip_id).padStart(3, "0")}`,
+    borrowerName: repairedRow.borrower_name,
+    employeeId: repairedRow.employee_id,
+    employeeName: repairedRow.employee_name,
+    issuedDate: formatDateValue(repairedRow.issued_date),
+    fineType: repairedRow.fine_type,
+    amount: Number(repairedRow.amount || 0),
+    reason: repairedRow.reason || "",
+    paymentStatus: repairedRow.payment_status,
+    paymentDate: formatDateValue(repairedRow.payment_date),
+    note: repairedRow.note || "",
+    deviceSummary: repairedRow.device_summary || "",
   };
 }
 
