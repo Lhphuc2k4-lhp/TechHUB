@@ -23,6 +23,121 @@ const OTP_TTL_MS = 10 * 60 * 1000;
 app.use(cors());
 app.use(express.json());
 
+function looksMisencoded(value = "") {
+  return /(?:Ã.|Â.|Ä.|Å.|Æ.|áº|á»|â€|â€œ|â€\u009d|â€™)/.test(value);
+}
+
+function repairText(value) {
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  let repairedValue = value;
+
+  for (let index = 0; index < 3; index += 1) {
+    if (!looksMisencoded(repairedValue)) {
+      break;
+    }
+
+    const decodedValue = Buffer.from(repairedValue, "latin1").toString("utf8");
+    if (!decodedValue || decodedValue === repairedValue) {
+      break;
+    }
+
+    repairedValue = decodedValue;
+  }
+
+  return repairedValue;
+}
+
+function repairPayload(payload) {
+  if (typeof payload === "string") {
+    return repairText(payload);
+  }
+
+  if (Array.isArray(payload)) {
+    return payload.map(repairPayload);
+  }
+
+  if (payload && typeof payload === "object") {
+    return Object.fromEntries(Object.entries(payload).map(([key, value]) => [key, repairPayload(value)]));
+  }
+
+  return payload;
+}
+
+app.use((req, res, next) => {
+  const originalJson = res.json.bind(res);
+  res.json = (payload) => originalJson(repairPayload(payload));
+  next();
+});
+
+async function resolveRequestUser(req) {
+  const headerUserId = Number(req.headers["x-user-id"]);
+  const headerRole = Number(req.headers["x-user-role"]);
+
+  if (!headerUserId || Number.isNaN(headerUserId)) {
+    return null;
+  }
+
+  const rows = await query(
+    `
+      SELECT id, role
+      FROM nhanvien
+      WHERE id = ?
+      LIMIT 1
+    `,
+    [headerUserId]
+  );
+
+  if (!rows.length) {
+    return null;
+  }
+
+  const user = {
+    id: Number(rows[0].id),
+    role: Number(rows[0].role),
+  };
+
+  if (!Number.isNaN(headerRole) && headerRole !== user.role) {
+    return null;
+  }
+
+  return user;
+}
+
+function requireAdmin(handler) {
+  return async (req, res, next) => {
+    try {
+      const user = await resolveRequestUser(req);
+      if (!user || user.role !== 0) {
+        return res.status(403).json({ message: "Chỉ quản trị viên mới được thực hiện thao tác này." });
+      }
+
+      req.authUser = user;
+      return handler(req, res, next);
+    } catch (error) {
+      return res.status(500).json({ message: "Không thể xác thực quyền truy cập.", error: error.message });
+    }
+  };
+}
+
+function requireEmployee(handler) {
+  return async (req, res, next) => {
+    try {
+      const user = await resolveRequestUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Bạn cần đăng nhập để thực hiện thao tác này." });
+      }
+
+      req.authUser = user;
+      return handler(req, res, next);
+    } catch (error) {
+      return res.status(500).json({ message: "Không thể xác thực quyền truy cập.", error: error.message });
+    }
+  };
+}
+
 function generateOtp() {
   return String(crypto.randomInt(0, 1000000)).padStart(6, "0");
 }
@@ -246,11 +361,11 @@ async function resolveEmployeeColumns() {
 }
 
 function normalizeText(value = "") {
-  return value
+  return repairText(value)
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/Ä‘/g, "d")
-    .replace(/Ä/g, "D")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
     .toLowerCase();
 }
 
@@ -329,45 +444,47 @@ function buildDeviceSelectSql(extraWhereClause = "", extraOrderClause = "ORDER B
 }
 
 function mapDevice(row) {
-  const normalizedStatus = normalizeText(row.status_name || "");
+  const repairedRow = repairPayload(row);
+  const normalizedStatus = normalizeText(repairedRow.status_name || "");
   const totalQuantity = 1;
-  const borrowedQuantity = Number(row.borrowed_quantity || 0) > 0 ? 1 : 0;
-  const availableQuantity = Number(row.available_quantity || 0) > 0 ? 1 : 0;
+  const borrowedQuantity = Number(repairedRow.borrowed_quantity || 0) > 0 ? 1 : 0;
+  const availableQuantity = Number(repairedRow.available_quantity || 0) > 0 ? 1 : 0;
   const isMaintenance = normalizedStatus !== "tot";
   const isBorrowedOut = !isMaintenance && borrowedQuantity > 0 && availableQuantity === 0;
   const statusLabel = isMaintenance ? "Cần bảo trì" : isBorrowedOut ? "Đang mượn" : "Sẵn sàng";
 
   return {
-    id: row.id,
-    code: row.code || "",
-    name: row.name,
-    brand: row.brand || "",
-    model: row.model || "",
-    sku: row.sku || "",
-    imageUrl: row.image_url,
-    productUrl: row.product_url || "",
-    typeId: row.type_id,
-    typeName: row.type_name,
-    statusId: row.status_id,
-    statusName: formatDeviceStatusName(row.status_name),
+    id: repairedRow.id,
+    code: repairedRow.code || "",
+    name: repairedRow.name,
+    brand: repairedRow.brand || "",
+    model: repairedRow.model || "",
+    sku: repairedRow.sku || "",
+    imageUrl: repairedRow.image_url,
+    productUrl: repairedRow.product_url || "",
+    typeId: repairedRow.type_id,
+    typeName: repairedRow.type_name,
+    statusId: repairedRow.status_id,
+    statusName: formatDeviceStatusName(repairedRow.status_name),
     totalQuantity,
     borrowedQuantity,
     availableQuantity,
     statusLabel,
     isAvailable: !isMaintenance && availableQuantity > 0,
-    description: row.description || `${row.name} thuá»™c nhÃ³m ${row.type_name}.`,
+    description: repairedRow.description || `${repairedRow.name} thuộc nhóm ${repairedRow.type_name}.`,
   };
 }
 
 function mapEmployee(row) {
+  const repairedRow = repairPayload(row);
   return {
-    id: row.id,
-    fullName: row.full_name,
-    username: row.username,
-    email: row.email,
-    role: Number(row.role),
-    roleLabel: Number(row.role) === 0 ? "Quáº£n trá»‹ viÃªn" : "NhÃ¢n viÃªn",
-    employeeCode: row.employee_code,
+    id: repairedRow.id,
+    fullName: repairedRow.full_name,
+    username: repairedRow.username,
+    email: repairedRow.email,
+    role: Number(repairedRow.role),
+    roleLabel: Number(repairedRow.role) === 0 ? "Quản trị viên" : "Nhân viên",
+    employeeCode: repairedRow.employee_code,
   };
 }
 
@@ -1217,7 +1334,7 @@ app.post("/api/auth/forgot-password/reset", async (req, res) => {
   }
 });
 
-app.get("/api/employees", async (req, res) => {
+app.get("/api/employees", requireAdmin(async (req, res) => {
   try {
     const role = req.query.role ? Number(req.query.role) : null;
     const filters = [];
@@ -1248,9 +1365,9 @@ app.get("/api/employees", async (req, res) => {
   } catch (error) {
     return res.status(500).json({ message: "KhÃ´ng láº¥y Ä‘Æ°á»£c danh sÃ¡ch nhÃ¢n viÃªn.", error: error.message });
   }
-});
+}));
 
-app.post("/api/employees", async (req, res) => {
+app.post("/api/employees", requireAdmin(async (req, res) => {
   try {
     const fullName = req.body.fullName?.trim();
     const username = req.body.username?.trim();
@@ -1293,10 +1410,15 @@ app.post("/api/employees", async (req, res) => {
   } catch (error) {
     return res.status(500).json({ message: "KhÃ´ng thá»ƒ táº¡o tÃ i khoáº£n.", error: error.message });
   }
-});
+}));
 
-app.get("/api/employees/:id", async (req, res) => {
+app.get("/api/employees/:id", requireEmployee(async (req, res) => {
   try {
+    const employeeId = Number(req.params.id);
+    if (req.authUser.role !== 0 && req.authUser.id !== employeeId) {
+      return res.status(403).json({ message: "Bạn không có quyền xem thông tin tài khoản này." });
+    }
+
     const rows = await query(
       `
         SELECT
@@ -1310,7 +1432,7 @@ app.get("/api/employees/:id", async (req, res) => {
         WHERE id = ?
         LIMIT 1
       `,
-      [Number(req.params.id)]
+      [employeeId]
     );
 
     if (!rows.length) {
@@ -1321,9 +1443,9 @@ app.get("/api/employees/:id", async (req, res) => {
   } catch (error) {
     return res.status(500).json({ message: "KhÃ´ng láº¥y Ä‘Æ°á»£c thÃ´ng tin tÃ i khoáº£n.", error: error.message });
   }
-});
+}));
 
-app.delete("/api/employees/:id", async (req, res) => {
+app.delete("/api/employees/:id", requireAdmin(async (req, res) => {
   try {
     const employeeId = Number(req.params.id);
 
@@ -1357,13 +1479,17 @@ app.delete("/api/employees/:id", async (req, res) => {
   } catch (error) {
     return res.status(500).json({ message: "KhÃ´ng thá»ƒ xÃ³a tÃ i khoáº£n.", error: error.message });
   }
-});
+}));
 
-app.put("/api/employees/:id/password", async (req, res) => {
+app.put("/api/employees/:id/password", requireEmployee(async (req, res) => {
   try {
     const employeeId = Number(req.params.id);
     const currentPassword = req.body.currentPassword?.trim();
     const newPassword = req.body.newPassword?.trim();
+
+    if (req.authUser.role !== 0 && req.authUser.id !== employeeId) {
+      return res.status(403).json({ message: "Bạn không có quyền đổi mật khẩu cho tài khoản này." });
+    }
 
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ message: "Vui lÃ²ng nháº­p Ä‘á»§ máº­t kháº©u hiá»‡n táº¡i vÃ  máº­t kháº©u má»›i." });
@@ -1384,7 +1510,7 @@ app.put("/api/employees/:id/password", async (req, res) => {
   } catch (error) {
     return res.status(500).json({ message: "KhÃ´ng thá»ƒ Ä‘á»•i máº­t kháº©u.", error: error.message });
   }
-});
+}));
 
 app.get("/api/borrowers", async (_req, res) => {
   try {
@@ -1521,7 +1647,7 @@ app.get("/api/devices", async (req, res) => {
   }
 });
 
-app.post("/api/devices", async (req, res) => {
+app.post("/api/devices", requireAdmin(async (req, res) => {
   try {
     const payload = normalizeDevicePayload(req.body);
     await validateDevicePayload(payload);
@@ -1560,7 +1686,7 @@ app.post("/api/devices", async (req, res) => {
   } catch (error) {
     return res.status(500).json({ message: error.message || "KhÃ´ng thá»ƒ thÃªm thiáº¿t bá»‹.", error: error.message });
   }
-});
+}));
 
 app.get("/api/devices/:id", async (req, res) => {
   try {
@@ -1583,7 +1709,7 @@ app.get("/api/devices/:id", async (req, res) => {
   }
 });
 
-app.put("/api/devices/:id", async (req, res) => {
+app.put("/api/devices/:id", requireAdmin(async (req, res) => {
   try {
     const deviceId = Number(req.params.id);
     const payload = normalizeDevicePayload(req.body);
@@ -1632,9 +1758,9 @@ app.put("/api/devices/:id", async (req, res) => {
   } catch (error) {
     return res.status(500).json({ message: error.message || "KhÃ´ng thá»ƒ cáº­p nháº­t thiáº¿t bá»‹.", error: error.message });
   }
-});
+}));
 
-app.delete("/api/devices/:id", async (req, res) => {
+app.delete("/api/devices/:id", requireAdmin(async (req, res) => {
   try {
     const deviceId = Number(req.params.id);
 
@@ -1668,7 +1794,7 @@ app.delete("/api/devices/:id", async (req, res) => {
   } catch (error) {
     return res.status(500).json({ message: error.message || "KhÃ´ng thá»ƒ xÃ³a thiáº¿t bá»‹.", error: error.message });
   }
-});
+}));
 
 app.get("/api/loan-slips", async (req, res) => {
   try {
@@ -1715,7 +1841,7 @@ app.get("/api/loan-slips", async (req, res) => {
   }
 });
 
-app.post("/api/loan-slips", async (req, res) => {
+app.post("/api/loan-slips", requireEmployee(async (req, res) => {
   const borrowerId = Number(req.body.borrowerId);
   const borrowerName = req.body.borrowerName?.trim() || "";
   const employeeId = Number(req.body.employeeId);
@@ -1726,6 +1852,10 @@ app.post("/api/loan-slips", async (req, res) => {
 
   if ((!borrowerId && !borrowerName) || !employeeId || !borrowDate || !dueDate || !items.length) {
     return res.status(400).json({ message: "Vui lÃ²ng nháº­p Ä‘áº§y Ä‘á»§ thÃ´ng tin phiáº¿u mÆ°á»£n." });
+  }
+
+  if (req.authUser.role !== 0 && req.authUser.id !== employeeId) {
+    return res.status(403).json({ message: "Bạn không có quyền lập phiếu mượn cho nhân viên khác." });
   }
 
   const normalizedItems = items
@@ -1800,9 +1930,9 @@ app.post("/api/loan-slips", async (req, res) => {
   } finally {
     connection.release();
   }
-});
+}));
 
-app.put("/api/loan-slips/:id/status", async (req, res) => {
+app.put("/api/loan-slips/:id/status", requireEmployee(async (req, res) => {
   const slipId = Number(req.params.id);
   const employeeId = Number(req.body.employeeId);
   const status = req.body.status?.trim();
@@ -1815,6 +1945,10 @@ app.put("/api/loan-slips/:id/status", async (req, res) => {
 
   if (!["da_tra", "hong_hoc", "qua_han"].includes(status)) {
     return res.status(400).json({ message: "Trạng thái cập nhật không hợp lệ." });
+  }
+
+  if (req.authUser.role !== 0 && req.authUser.id !== employeeId) {
+    return res.status(403).json({ message: "Bạn không có quyền xử lý phiếu mượn cho nhân viên khác." });
   }
 
   const connection = await getConnection();
@@ -1915,7 +2049,7 @@ app.put("/api/loan-slips/:id/status", async (req, res) => {
   } finally {
     connection.release();
   }
-});
+}));
 
 app.get("/api/fine-slips", async (req, res) => {
   try {
@@ -1963,7 +2097,7 @@ app.get("/api/fine-slips", async (req, res) => {
   }
 });
 
-app.post("/api/fine-slips", async (req, res) => {
+app.post("/api/fine-slips", requireEmployee(async (req, res) => {
   const connection = await getConnection();
 
   try {
@@ -1979,6 +2113,10 @@ app.post("/api/fine-slips", async (req, res) => {
 
     if (!loanSlipId || !employeeId || !issuedDate || !fineType || Number.isNaN(amount)) {
       return res.status(400).json({ message: "Vui lòng nhập đầy đủ thông tin phiếu phạt." });
+    }
+
+    if (req.authUser.role !== 0 && req.authUser.id !== employeeId) {
+      return res.status(403).json({ message: "Bạn không có quyền lập phiếu phạt cho nhân viên khác." });
     }
 
     await connection.beginTransaction();
@@ -2027,9 +2165,9 @@ app.post("/api/fine-slips", async (req, res) => {
   } finally {
     connection.release();
   }
-});
+}));
 
-app.put("/api/fine-slips/:id", async (req, res) => {
+app.put("/api/fine-slips/:id", requireEmployee(async (req, res) => {
   const connection = await getConnection();
 
   try {
@@ -2046,6 +2184,10 @@ app.put("/api/fine-slips/:id", async (req, res) => {
 
     if (!fineId || !loanSlipId || !employeeId || !issuedDate || !fineType || Number.isNaN(amount)) {
       return res.status(400).json({ message: "Vui lòng nhập đầy đủ thông tin phiếu phạt." });
+    }
+
+    if (req.authUser.role !== 0 && req.authUser.id !== employeeId) {
+      return res.status(403).json({ message: "Bạn không có quyền cập nhật phiếu phạt cho nhân viên khác." });
     }
 
     await connection.beginTransaction();
@@ -2103,9 +2245,9 @@ app.put("/api/fine-slips/:id", async (req, res) => {
   } finally {
     connection.release();
   }
-});
+}));
 
-app.delete("/api/fine-slips/:id", async (req, res) => {
+app.delete("/api/fine-slips/:id", requireAdmin(async (req, res) => {
   try {
     const fineId = Number(req.params.id);
     const existingRows = await query(`SELECT id FROM phieuphat WHERE id = ? LIMIT 1`, [fineId]);
@@ -2118,9 +2260,9 @@ app.delete("/api/fine-slips/:id", async (req, res) => {
   } catch (error) {
     return res.status(500).json({ message: "Không thể xóa phiếu phạt.", error: error.message });
   }
-});
+}));
 
-app.post("/api/restore", async (req, res) => {
+app.post("/api/restore", requireAdmin(async (req, res) => {
   try {
     const target = req.body.target?.trim();
     const fileName = req.body.fileName?.trim();
@@ -2159,7 +2301,7 @@ app.post("/api/restore", async (req, res) => {
   } catch (error) {
     return res.status(500).json({ message: error.message || "Không thể phục hồi dữ liệu.", error: error.message });
   }
-});
+}));
 
 Promise.all([resolveDeviceImageColumn(), resolveEmployeeColumns()]).finally(() => {
   app.listen(port, () => {
