@@ -1416,7 +1416,7 @@ app.get("/api/device-types", async (_req, res) => {
         SELECT
           lt.id,
           lt.ten_loai AS name,
-          COUNT(tb.id) AS total_devices
+          COALESCE(SUM(tb.tong_so_luong), 0) AS total_devices
         FROM loaithietbi lt
         LEFT JOIN thietbi tb ON tb.loai_id = lt.id
         GROUP BY lt.id, lt.ten_loai
