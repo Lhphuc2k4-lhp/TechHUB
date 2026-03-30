@@ -457,6 +457,64 @@ function getReturnConditionLabel(status) {
   return "Tot";
 }
 
+async function syncLoanSlipAfterFinePayment(connection, { loanSlipId, employeeId, paymentStatus, paymentDate }) {
+  if (paymentStatus !== "da_thanh_toan") {
+    return false;
+  }
+
+  const normalizedPaymentDate = paymentDate?.trim() || new Date().toISOString().slice(0, 10);
+  const [loanRows] = await connection.execute(
+    `
+      SELECT id, trang_thai
+      FROM phieumuon
+      WHERE id = ?
+      LIMIT 1
+    `,
+    [loanSlipId]
+  );
+
+  if (!loanRows.length) {
+    throw new Error("Khong tim thay phieu muon lien quan.");
+  }
+
+  if (loanRows[0].trang_thai !== "qua_han") {
+    return false;
+  }
+
+  await connection.execute(`UPDATE phieumuon SET trang_thai = 'da_tra' WHERE id = ?`, [loanSlipId]);
+
+  const [returnRows] = await connection.execute(
+    `
+      SELECT id
+      FROM phieutra
+      WHERE phieu_muon_id = ?
+      LIMIT 1
+    `,
+    [loanSlipId]
+  );
+
+  if (returnRows.length) {
+    await connection.execute(
+      `
+        UPDATE phieutra
+        SET nhan_vien_id = ?, ngay_tra = ?, tinh_trang_sau_khi_tra = ?, ghi_chu = ?
+        WHERE phieu_muon_id = ?
+      `,
+      [employeeId, normalizedPaymentDate, getReturnConditionLabel("da_tra"), "Hoan tat sau khi thanh toan phieu phat.", loanSlipId]
+    );
+  } else {
+    await connection.execute(
+      `
+        INSERT INTO phieutra (phieu_muon_id, nhan_vien_id, ngay_tra, tinh_trang_sau_khi_tra, ghi_chu)
+        VALUES (?, ?, ?, ?, ?)
+      `,
+      [loanSlipId, employeeId, normalizedPaymentDate, getReturnConditionLabel("da_tra"), "Hoan tat sau khi thanh toan phieu phat."]
+    );
+  }
+
+  return true;
+}
+
 function formatDateValue(value) {
   if (!value) return null;
 
@@ -1921,6 +1979,8 @@ app.get("/api/fine-slips", async (req, res) => {
 });
 
 app.post("/api/fine-slips", async (req, res) => {
+  const connection = await getConnection();
+
   try {
     const loanSlipId = Number(req.body.loanSlipId);
     const employeeId = Number(req.body.employeeId);
@@ -1936,12 +1996,15 @@ app.post("/api/fine-slips", async (req, res) => {
       return res.status(400).json({ message: "Vui long nhap day du thong tin phieu phat." });
     }
 
-    const existingFineRows = await query(`SELECT id FROM phieuphat WHERE phieu_muon_id = ? LIMIT 1`, [loanSlipId]);
+    await connection.beginTransaction();
+
+    const [existingFineRows] = await connection.execute(`SELECT id FROM phieuphat WHERE phieu_muon_id = ? LIMIT 1`, [loanSlipId]);
     if (existingFineRows.length) {
+      await connection.rollback();
       return res.status(400).json({ message: "Phieu muon nay da duoc lap phieu phat." });
     }
 
-    await query(
+    await connection.execute(
       `
         INSERT INTO phieuphat (
           phieu_muon_id,
@@ -1959,13 +2022,31 @@ app.post("/api/fine-slips", async (req, res) => {
       [loanSlipId, employeeId, issuedDate, fineType, amount, reason, paymentStatus, paymentDate, note]
     );
 
-    return res.status(201).json({ message: "Tao phieu phat thanh cong." });
+    const didSyncLoanSlip = await syncLoanSlipAfterFinePayment(connection, {
+      loanSlipId,
+      employeeId,
+      paymentStatus,
+      paymentDate,
+    });
+
+    await connection.commit();
+
+    return res.status(201).json({
+      message: didSyncLoanSlip
+        ? "Tao phieu phat thanh cong va da cap nhat phieu muon sang da tra."
+        : "Tao phieu phat thanh cong.",
+    });
   } catch (error) {
+    await connection.rollback();
     return res.status(500).json({ message: "Khong the tao phieu phat.", error: error.message });
+  } finally {
+    connection.release();
   }
 });
 
 app.put("/api/fine-slips/:id", async (req, res) => {
+  const connection = await getConnection();
+
   try {
     const fineId = Number(req.params.id);
     const loanSlipId = Number(req.body.loanSlipId);
@@ -1982,20 +2063,24 @@ app.put("/api/fine-slips/:id", async (req, res) => {
       return res.status(400).json({ message: "Vui long nhap day du thong tin phieu phat." });
     }
 
-    const existingRows = await query(`SELECT id FROM phieuphat WHERE id = ? LIMIT 1`, [fineId]);
+    await connection.beginTransaction();
+
+    const [existingRows] = await connection.execute(`SELECT id FROM phieuphat WHERE id = ? LIMIT 1`, [fineId]);
     if (!existingRows.length) {
+      await connection.rollback();
       return res.status(404).json({ message: "Khong tim thay phieu phat." });
     }
 
-    const duplicateLoanSlipRows = await query(
+    const [duplicateLoanSlipRows] = await connection.execute(
       `SELECT id FROM phieuphat WHERE phieu_muon_id = ? AND id <> ? LIMIT 1`,
       [loanSlipId, fineId]
     );
     if (duplicateLoanSlipRows.length) {
+      await connection.rollback();
       return res.status(400).json({ message: "Phieu muon nay da duoc lap phieu phat." });
     }
 
-    await query(
+    await connection.execute(
       `
         UPDATE phieuphat
         SET
@@ -2013,9 +2098,25 @@ app.put("/api/fine-slips/:id", async (req, res) => {
       [loanSlipId, employeeId, issuedDate, fineType, amount, reason, paymentStatus, paymentDate, note, fineId]
     );
 
-    return res.json({ message: "Cap nhat phieu phat thanh cong." });
+    const didSyncLoanSlip = await syncLoanSlipAfterFinePayment(connection, {
+      loanSlipId,
+      employeeId,
+      paymentStatus,
+      paymentDate,
+    });
+
+    await connection.commit();
+
+    return res.json({
+      message: didSyncLoanSlip
+        ? "Cap nhat phieu phat thanh cong va da cap nhat phieu muon sang da tra."
+        : "Cap nhat phieu phat thanh cong.",
+    });
   } catch (error) {
+    await connection.rollback();
     return res.status(500).json({ message: "Khong the cap nhat phieu phat.", error: error.message });
+  } finally {
+    connection.release();
   }
 });
 
