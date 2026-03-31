@@ -512,6 +512,10 @@ function mapEmployee(row) {
 }
 
 function normalizeDevicePayload(body = {}) {
+  const rawImageUrl = typeof body.imageUrl === "string" ? body.imageUrl.trim() : "";
+  const normalizedImageUrl =
+    rawImageUrl && !rawImageUrl.startsWith("data:") && rawImageUrl.length <= 255 ? rawImageUrl : null;
+
   return {
     code: body.code?.trim(),
     name: body.name?.trim(),
@@ -519,7 +523,7 @@ function normalizeDevicePayload(body = {}) {
     model: body.model?.trim() || null,
     sku: body.sku?.trim() || null,
     description: body.description?.trim() || null,
-    imageUrl: body.imageUrl?.trim() || null,
+    imageUrl: normalizedImageUrl,
     productUrl: body.productUrl?.trim() || null,
     typeId: Number(body.typeId),
     statusId: Number(body.statusId),
@@ -528,21 +532,21 @@ function normalizeDevicePayload(body = {}) {
 
 async function validateDevicePayload(payload, deviceId = null) {
   if (!payload.code || !payload.name || !payload.typeId || !payload.statusId) {
-    throw new Error("Vui lÃ²ng nháº­p Ä‘áº§y Ä‘á»§ thÃ´ng tin thiáº¿t bá»‹.");
+    throw new Error("Vui lòng nhập đầy đủ thông tin thiết bị.");
   }
 
   if (Number.isNaN(payload.typeId) || Number.isNaN(payload.statusId)) {
-    throw new Error("Dá»¯ liá»‡u thiáº¿t bá»‹ khÃ´ng há»£p lá»‡.");
+    throw new Error("Dữ liệu thiết bị không hợp lệ.");
   }
 
   const typeRows = await query(`SELECT id FROM loaithietbi WHERE id = ? LIMIT 1`, [payload.typeId]);
   if (!typeRows.length) {
-    throw new Error("Danh má»¥c thiáº¿t bá»‹ khÃ´ng tá»“n táº¡i.");
+    throw new Error("Danh mục thiết bị không tồn tại.");
   }
 
   const statusRows = await query(`SELECT id FROM tinhtrangthietbi WHERE id = ? LIMIT 1`, [payload.statusId]);
   if (!statusRows.length) {
-    throw new Error("Tráº¡ng thÃ¡i thiáº¿t bá»‹ khÃ´ng tá»“n táº¡i.");
+    throw new Error("Trạng thái thiết bị không tồn tại.");
   }
 
   const duplicateRows = await query(
@@ -557,7 +561,7 @@ async function validateDevicePayload(payload, deviceId = null) {
   );
 
   if (duplicateRows.length) {
-    throw new Error("MÃ£ thiáº¿t bá»‹ hoáº·c SKU Ä‘Ã£ tá»“n táº¡i.");
+    throw new Error("Mã thiết bị hoặc SKU đã tồn tại.");
   }
 }
 
@@ -1720,7 +1724,7 @@ app.get("/api/devices", async (req, res) => {
     const rows = await query(buildDeviceSelectSql(filters.length ? `WHERE ${filters.join(" AND ")}` : ""), params);
     res.json(rows.map(mapDevice));
   } catch (error) {
-    res.status(500).json({ message: "KhÃ´ng láº¥y Ä‘Æ°á»£c danh sÃ¡ch thiáº¿t bá»‹.", error: error.message });
+    res.status(500).json({ message: "Không lấy được danh sách thiết bị.", error: error.message });
   }
 });
 
@@ -1759,9 +1763,14 @@ app.post("/api/devices", requireAdmin(async (req, res) => {
       ]
     );
 
-    return res.status(201).json({ message: "ThÃªm thiáº¿t bá»‹ thÃ nh cÃ´ng.", id: result.insertId });
+    return res.status(201).json({ message: "Thêm thiết bị thành công.", id: result.insertId });
   } catch (error) {
-    return res.status(500).json({ message: error.message || "KhÃ´ng thá»ƒ thÃªm thiáº¿t bá»‹.", error: error.message });
+    const statusCode = error?.code === "ER_DATA_TOO_LONG" ? 400 : 500;
+    const fallbackMessage =
+      error?.code === "ER_DATA_TOO_LONG"
+        ? "Dữ liệu ảnh quá dài. Vui lòng dùng link ảnh ngắn hơn hoặc bỏ ảnh rồi thử lại."
+        : "Không thể thêm thiết bị.";
+    return res.status(statusCode).json({ message: error.message || fallbackMessage, error: error.message });
   }
 }));
 
@@ -1771,7 +1780,7 @@ app.get("/api/devices/:id", async (req, res) => {
     const rows = await query(buildDeviceSelectSql("WHERE tb.id = ?", "", "LIMIT 1"), [deviceId]);
 
     if (!rows.length) {
-      return res.status(404).json({ message: "KhÃ´ng tÃ¬m tháº¥y thiáº¿t bá»‹." });
+      return res.status(404).json({ message: "Không tìm thấy thiết bị." });
     }
 
     const device = mapDevice(rows[0]);
@@ -1782,7 +1791,7 @@ app.get("/api/devices/:id", async (req, res) => {
 
     return res.json({ ...device, relatedDevices: relatedRows.map(mapDevice) });
   } catch (error) {
-    return res.status(500).json({ message: "KhÃ´ng láº¥y Ä‘Æ°á»£c chi tiáº¿t thiáº¿t bá»‹.", error: error.message });
+    return res.status(500).json({ message: "Không lấy được chi tiết thiết bị.", error: error.message });
   }
 });
 
@@ -1793,7 +1802,7 @@ app.put("/api/devices/:id", requireAdmin(async (req, res) => {
 
     const existingRows = await query(buildDeviceSelectSql("WHERE tb.id = ?", "", "LIMIT 1"), [deviceId]);
     if (!existingRows.length) {
-      return res.status(404).json({ message: "KhÃ´ng tÃ¬m tháº¥y thiáº¿t bá»‹." });
+      return res.status(404).json({ message: "Không tìm thấy thiết bị." });
     }
 
     await validateDevicePayload(payload, deviceId);
@@ -1830,10 +1839,15 @@ app.put("/api/devices/:id", requireAdmin(async (req, res) => {
     );
 
     return res.json({
-      message: "Cáº­p nháº­t thiáº¿t bá»‹ thÃ nh cÃ´ng.",
+      message: "Cập nhật thiết bị thành công.",
     });
   } catch (error) {
-    return res.status(500).json({ message: error.message || "KhÃ´ng thá»ƒ cáº­p nháº­t thiáº¿t bá»‹.", error: error.message });
+    const statusCode = error?.code === "ER_DATA_TOO_LONG" ? 400 : 500;
+    const fallbackMessage =
+      error?.code === "ER_DATA_TOO_LONG"
+        ? "Dữ liệu ảnh quá dài. Vui lòng dùng link ảnh ngắn hơn hoặc bỏ ảnh rồi thử lại."
+        : "Không thể cập nhật thiết bị.";
+    return res.status(statusCode).json({ message: error.message || fallbackMessage, error: error.message });
   }
 }));
 
@@ -1843,7 +1857,7 @@ app.delete("/api/devices/:id", requireAdmin(async (req, res) => {
 
     const rows = await query(`SELECT id, ten FROM thietbi WHERE id = ? LIMIT 1`, [deviceId]);
     if (!rows.length) {
-      return res.status(404).json({ message: "KhÃ´ng tÃ¬m tháº¥y thiáº¿t bá»‹." });
+      return res.status(404).json({ message: "Không tìm thấy thiết bị." });
     }
 
     const activeBorrowRows = await query(
@@ -1858,18 +1872,18 @@ app.delete("/api/devices/:id", requireAdmin(async (req, res) => {
     );
 
     if (Number(activeBorrowRows[0]?.borrowed_quantity || 0) > 0) {
-      return res.status(400).json({ message: "Thiáº¿t bá»‹ Ä‘ang náº±m trong phiáº¿u mÆ°á»£n, khÃ´ng thá»ƒ xÃ³a." });
+      return res.status(400).json({ message: "Thiết bị đang nằm trong phiếu mượn, không thể xóa." });
     }
 
     const historyRows = await query(`SELECT phieu_muon_id FROM chitietphieumuon WHERE thiet_bi_id = ? LIMIT 1`, [deviceId]);
     if (historyRows.length) {
-      return res.status(400).json({ message: "Thiáº¿t bá»‹ Ä‘Ã£ cÃ³ lá»‹ch sá»­ phiáº¿u mÆ°á»£n, khÃ´ng thá»ƒ xÃ³a." });
+      return res.status(400).json({ message: "Thiết bị đã có lịch sử phiếu mượn, không thể xóa." });
     }
 
     await query(`DELETE FROM thietbi WHERE id = ?`, [deviceId]);
-    return res.json({ message: "XÃ³a thiáº¿t bá»‹ thÃ nh cÃ´ng." });
+    return res.json({ message: "Xóa thiết bị thành công." });
   } catch (error) {
-    return res.status(500).json({ message: error.message || "KhÃ´ng thá»ƒ xÃ³a thiáº¿t bá»‹.", error: error.message });
+    return res.status(500).json({ message: error.message || "Không thể xóa thiết bị.", error: error.message });
   }
 }));
 
