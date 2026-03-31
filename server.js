@@ -21,7 +21,7 @@ const passwordResetOtps = new Map();
 const OTP_TTL_MS = 10 * 60 * 1000;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
 
 function looksMisencoded(value = "") {
   return /(?:Ã.|Â.|Ä.|Å.|Æ.|áº|á»|â€|â€œ|â€\u009d|â€™)/.test(value);
@@ -1468,6 +1468,57 @@ app.get("/api/employees/:id", requireEmployee(async (req, res) => {
     return res.json(mapEmployee(rows[0]));
   } catch (error) {
     return res.status(500).json({ message: "KhÃ´ng láº¥y Ä‘Æ°á»£c thÃ´ng tin tÃ i khoáº£n.", error: error.message });
+  }
+}));
+
+app.put("/api/employees/:id", requireEmployee(async (req, res) => {
+  try {
+    const employeeId = Number(req.params.id);
+    const fullName = req.body.fullName?.trim();
+    const email = req.body.email?.trim().toLowerCase();
+
+    if (req.authUser.role !== 0 && req.authUser.id !== employeeId) {
+      return res.status(403).json({ message: "Bạn không có quyền cập nhật tài khoản này." });
+    }
+
+    if (!fullName || !email) {
+      return res.status(400).json({ message: "Vui lòng nhập đầy đủ họ tên và email." });
+    }
+
+    const rows = await query(`SELECT id, role FROM nhanvien WHERE id = ? LIMIT 1`, [employeeId]);
+    if (!rows.length) {
+      return res.status(404).json({ message: "Không tìm thấy nhân viên." });
+    }
+
+    const duplicateRows = await query(`SELECT id FROM nhanvien WHERE LOWER(email) = ? AND id <> ? LIMIT 1`, [email, employeeId]);
+    if (duplicateRows.length) {
+      return res.status(400).json({ message: "Email này đã được sử dụng bởi tài khoản khác." });
+    }
+
+    await query(`UPDATE nhanvien SET ${employeeNameColumn} = ?, email = ? WHERE id = ?`, [fullName, email, employeeId]);
+
+    const updatedRows = await query(
+      `
+        SELECT
+          id,
+          ${employeeNameColumn} AS full_name,
+          username,
+          email,
+          role,
+          ${employeeCodeColumn} AS employee_code
+        FROM nhanvien
+        WHERE id = ?
+        LIMIT 1
+      `,
+      [employeeId]
+    );
+
+    return res.json({
+      message: "Cập nhật thông tin tài khoản thành công.",
+      user: mapEmployee(updatedRows[0]),
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Không thể cập nhật tài khoản.", error: error.message });
   }
 }));
 
