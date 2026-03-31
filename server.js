@@ -395,6 +395,22 @@ function formatDeviceStatusName(value = "") {
   return value;
 }
 
+function getTodayDateString() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function isDateBeforeToday(value) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(String(value).trim())) {
+    return false;
+  }
+
+  return String(value).trim() < getTodayDateString();
+}
+
 function getBorrowedQuantitySql(alias) {
   return `
     COALESCE(
@@ -449,9 +465,16 @@ function mapDevice(row) {
   const totalQuantity = 1;
   const borrowedQuantity = Number(repairedRow.borrowed_quantity || 0) > 0 ? 1 : 0;
   const availableQuantity = Number(repairedRow.available_quantity || 0) > 0 ? 1 : 0;
-  const isMaintenance = normalizedStatus !== "tot";
-  const isBorrowedOut = !isMaintenance && borrowedQuantity > 0 && availableQuantity === 0;
-  const statusLabel = isMaintenance ? "Cần bảo trì" : isBorrowedOut ? "Đang mượn" : "Sẵn sàng";
+  const isBroken = normalizedStatus === "hong";
+  const isMaintenance = normalizedStatus === "dang bao tri";
+  const isBorrowedOut = normalizedStatus === "tot" && borrowedQuantity > 0 && availableQuantity === 0;
+  const statusLabel = isBroken
+    ? "Hỏng"
+    : isMaintenance
+      ? "Cần bảo trì"
+      : isBorrowedOut
+        ? "Đang mượn"
+        : "Sẵn sàng";
 
   return {
     id: repairedRow.id,
@@ -470,7 +493,7 @@ function mapDevice(row) {
     borrowedQuantity,
     availableQuantity,
     statusLabel,
-    isAvailable: !isMaintenance && availableQuantity > 0,
+    isAvailable: !isBroken && !isMaintenance && availableQuantity > 0,
     description: repairedRow.description || `${repairedRow.name} thuộc nhóm ${repairedRow.type_name}.`,
   };
 }
@@ -1857,6 +1880,14 @@ app.post("/api/loan-slips", requireEmployee(async (req, res) => {
     return res.status(400).json({ message: "Vui lÃ²ng nháº­p Ä‘áº§y Ä‘á»§ thÃ´ng tin phiáº¿u mÆ°á»£n." });
   }
 
+  if (isDateBeforeToday(borrowDate) || isDateBeforeToday(dueDate)) {
+    return res.status(400).json({ message: "Ngày mượn và hạn trả không được nhỏ hơn ngày hiện tại." });
+  }
+
+  if (dueDate < borrowDate) {
+    return res.status(400).json({ message: "Hạn trả không được nhỏ hơn ngày mượn." });
+  }
+
   if (req.authUser.role !== 0 && req.authUser.id !== employeeId) {
     return res.status(403).json({ message: "Bạn không có quyền lập phiếu mượn cho nhân viên khác." });
   }
@@ -2116,6 +2147,14 @@ app.post("/api/fine-slips", requireEmployee(async (req, res) => {
 
     if (!loanSlipId || !employeeId || !issuedDate || !fineType || Number.isNaN(amount)) {
       return res.status(400).json({ message: "Vui lòng nhập đầy đủ thông tin phiếu phạt." });
+    }
+
+    if (isDateBeforeToday(issuedDate) || (paymentDate && isDateBeforeToday(paymentDate))) {
+      return res.status(400).json({ message: "Ngày phạt và ngày thanh toán không được nhỏ hơn ngày hiện tại." });
+    }
+
+    if (paymentDate && paymentDate < issuedDate) {
+      return res.status(400).json({ message: "Ngày thanh toán không được nhỏ hơn ngày phạt." });
     }
 
     if (req.authUser.role !== 0 && req.authUser.id !== employeeId) {
