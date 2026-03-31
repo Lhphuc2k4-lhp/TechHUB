@@ -2,12 +2,16 @@
 import cors from "cors";
 import dotenv from "dotenv";
 import crypto from "crypto";
+import fs from "fs";
 import path from "path";
+import multer from "multer";
 import { fileURLToPath } from "url";
 import { checkDatabaseConnection, getConnection, query } from "./db.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const uploadsRoot = path.join(__dirname, "uploads");
+const deviceUploadsDir = path.join(uploadsRoot, "devices");
 
 dotenv.config({ path: path.join(__dirname, ".env") });
 
@@ -20,8 +24,32 @@ let employeeCodeColumn = "ma_nv";
 const passwordResetOtps = new Map();
 const OTP_TTL_MS = 10 * 60 * 1000;
 
+fs.mkdirSync(deviceUploadsDir, { recursive: true });
+
+const deviceImageUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, callback) => callback(null, deviceUploadsDir),
+    filename: (_req, file, callback) => {
+      const extension = path.extname(file.originalname || "").toLowerCase() || ".png";
+      callback(null, `device-${Date.now()}-${crypto.randomBytes(6).toString("hex")}${extension}`);
+    },
+  }),
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+  },
+  fileFilter: (_req, file, callback) => {
+    if (!file.mimetype?.startsWith("image/")) {
+      callback(new Error("Chỉ chấp nhận file ảnh."));
+      return;
+    }
+
+    callback(null, true);
+  },
+});
+
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
+app.use("/uploads", express.static(uploadsRoot));
 
 function looksMisencoded(value = "") {
   return /(?:Ã.|Â.|Ä.|Å.|Æ.|áº|á»|â€|â€œ|â€\u009d|â€™)/.test(value);
@@ -428,6 +456,15 @@ function getBorrowedQuantitySql(alias) {
 
 function buildDeviceSelectSql(extraWhereClause = "", extraOrderClause = "ORDER BY tb.id", extraLimitClause = "") {
   const borrowedQuantitySql = getBorrowedQuantitySql("tb");
+  const primaryImageSql = `
+    (
+      SELECT hatb.image_url
+      FROM hinhanhthietbi hatb
+      WHERE hatb.thiet_bi_id = tb.id
+      ORDER BY hatb.thu_tu ASC, hatb.id ASC
+      LIMIT 1
+    )
+  `;
 
   return `
     SELECT
@@ -440,7 +477,7 @@ function buildDeviceSelectSql(extraWhereClause = "", extraOrderClause = "ORDER B
       tb.mo_ta AS description,
       tb.url_san_pham AS product_url,
       1 AS total_quantity,
-      tb.${deviceImageColumn} AS image_url,
+      ${primaryImageSql} AS image_url,
       tb.loai_id AS type_id,
       lt.ten_loai AS type_name,
       tb.tinh_trang_id AS status_id,
@@ -515,6 +552,13 @@ function normalizeDevicePayload(body = {}) {
   const rawImageUrl = typeof body.imageUrl === "string" ? body.imageUrl.trim() : "";
   const normalizedImageUrl =
     rawImageUrl && !rawImageUrl.startsWith("data:") && rawImageUrl.length <= 255 ? rawImageUrl : null;
+  const galleryImages = Array.isArray(body.galleryImages)
+    ? body.galleryImages
+        .map((item) => (typeof item === "string" ? item.trim() : ""))
+        .filter((item) => item && !item.startsWith("data:") && item.length <= 255)
+    : normalizedImageUrl
+      ? [normalizedImageUrl]
+      : [];
 
   return {
     code: body.code?.trim(),
@@ -524,6 +568,7 @@ function normalizeDevicePayload(body = {}) {
     sku: body.sku?.trim() || null,
     description: body.description?.trim() || null,
     imageUrl: normalizedImageUrl,
+    galleryImages,
     productUrl: body.productUrl?.trim() || null,
     typeId: Number(body.typeId),
     statusId: Number(body.statusId),
@@ -563,6 +608,31 @@ async function validateDevicePayload(payload, deviceId = null) {
   if (duplicateRows.length) {
     throw new Error("Mã thiết bị hoặc SKU đã tồn tại.");
   }
+}
+
+async function syncDeviceImages(deviceId, imageUrls = []) {
+  const normalizedImages = [...new Set((imageUrls || []).filter(Boolean))];
+
+  await query(`DELETE FROM hinhanhthietbi WHERE thiet_bi_id = ?`, [deviceId]);
+
+  for (let index = 0; index < normalizedImages.length; index += 1) {
+    await query(
+      `
+        INSERT INTO hinhanhthietbi (thiet_bi_id, image_url, thu_tu)
+        VALUES (?, ?, ?)
+      `,
+      [deviceId, normalizedImages[index], index + 1]
+    );
+  }
+
+  await query(
+    `
+      UPDATE thietbi
+      SET ${deviceImageColumn} = ?
+      WHERE id = ?
+    `,
+    [normalizedImages[0] || null, deviceId]
+  );
 }
 
 function mapLoanSlip(row) {
@@ -1728,6 +1798,31 @@ app.get("/api/devices", async (req, res) => {
   }
 });
 
+app.post(
+  "/api/uploads/device-image",
+  requireAdmin((req, res) => {
+    deviceImageUpload.single("image")(req, res, (error) => {
+      if (error) {
+        const message =
+          error.code === "LIMIT_FILE_SIZE"
+            ? "Ảnh tải lên quá lớn. Vui lòng chọn ảnh nhỏ hơn 5MB."
+            : error.message || "Không thể tải ảnh lên.";
+        return res.status(400).json({ message });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: "Vui lòng chọn một file ảnh." });
+      }
+
+      const imageUrl = `${req.protocol}://${req.get("host")}/uploads/devices/${req.file.filename}`;
+      return res.status(201).json({
+        message: "Tải ảnh lên thành công.",
+        imageUrl,
+      });
+    });
+  })
+);
+
 app.post("/api/devices", requireAdmin(async (req, res) => {
   try {
     const payload = normalizeDevicePayload(req.body);
@@ -1759,9 +1854,11 @@ app.post("/api/devices", requireAdmin(async (req, res) => {
         payload.description,
         payload.productUrl,
         payload.statusId,
-        payload.imageUrl,
+        null,
       ]
     );
+
+    await syncDeviceImages(result.insertId, payload.galleryImages);
 
     return res.status(201).json({ message: "Thêm thiết bị thành công.", id: result.insertId });
   } catch (error) {
@@ -1784,12 +1881,25 @@ app.get("/api/devices/:id", async (req, res) => {
     }
 
     const device = mapDevice(rows[0]);
+    const imageRows = await query(
+      `
+        SELECT image_url
+        FROM hinhanhthietbi
+        WHERE thiet_bi_id = ?
+        ORDER BY thu_tu ASC, id ASC
+      `,
+      [deviceId]
+    );
     const relatedRows = await query(
       buildDeviceSelectSql("WHERE tb.loai_id = ? AND tb.id <> ?", "ORDER BY tb.id", "LIMIT 4"),
       [device.typeId, device.id]
     );
 
-    return res.json({ ...device, relatedDevices: relatedRows.map(mapDevice) });
+    return res.json({
+      ...device,
+      galleryImages: imageRows.map((row) => repairPayload(row).image_url).filter(Boolean),
+      relatedDevices: relatedRows.map(mapDevice),
+    });
   } catch (error) {
     return res.status(500).json({ message: "Không lấy được chi tiết thiết bị.", error: error.message });
   }
@@ -1833,10 +1943,12 @@ app.put("/api/devices/:id", requireAdmin(async (req, res) => {
         payload.description,
         payload.productUrl,
         payload.statusId,
-        payload.imageUrl,
+        null,
         deviceId,
       ]
     );
+
+    await syncDeviceImages(deviceId, payload.galleryImages);
 
     return res.json({
       message: "Cập nhật thiết bị thành công.",
