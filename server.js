@@ -2217,6 +2217,10 @@ app.put("/api/loan-slips/:id/status", requireEmployee(async (req, res) => {
       throw new Error("Phiếu mượn này đã được xác nhận trả.");
     }
 
+    if (currentStatus === "qua_han" && status === "da_tra") {
+      throw new Error("Phiếu mượn quá hạn chỉ được chuyển sang đã trả sau khi thanh toán phiếu phạt.");
+    }
+
     if (status === "qua_han" && dueDate && returnDate <= dueDate) {
       throw new Error("Ngày trả khi chọn quá hạn phải lớn hơn hạn trả của phiếu mượn.");
     }
@@ -2375,6 +2379,26 @@ app.post("/api/fine-slips", requireEmployee(async (req, res) => {
 
     await connection.beginTransaction();
 
+    const [loanSlipRows] = await connection.execute(
+      `
+        SELECT id, trang_thai
+        FROM phieumuon
+        WHERE id = ?
+        LIMIT 1
+      `,
+      [loanSlipId]
+    );
+
+    if (!loanSlipRows.length) {
+      await connection.rollback();
+      return res.status(404).json({ message: "Không tìm thấy phiếu mượn." });
+    }
+
+    if (!["qua_han", "hong_hoc"].includes(loanSlipRows[0].trang_thai)) {
+      await connection.rollback();
+      return res.status(400).json({ message: "Chỉ có thể lập phiếu phạt cho phiếu mượn quá hạn hoặc hỏng hóc." });
+    }
+
     const [existingFineRows] = await connection.execute(`SELECT id FROM phieuphat WHERE phieu_muon_id = ? LIMIT 1`, [loanSlipId]);
     if (existingFineRows.length) {
       await connection.rollback();
@@ -2459,6 +2483,26 @@ app.put("/api/fine-slips/:id", requireEmployee(async (req, res) => {
     if (duplicateLoanSlipRows.length) {
       await connection.rollback();
       return res.status(400).json({ message: "Phiếu mượn này đã được lập phiếu phạt." });
+    }
+
+    const [loanSlipRows] = await connection.execute(
+      `
+        SELECT id, trang_thai
+        FROM phieumuon
+        WHERE id = ?
+        LIMIT 1
+      `,
+      [loanSlipId]
+    );
+
+    if (!loanSlipRows.length) {
+      await connection.rollback();
+      return res.status(404).json({ message: "Không tìm thấy phiếu mượn." });
+    }
+
+    if (!["qua_han", "hong_hoc"].includes(loanSlipRows[0].trang_thai)) {
+      await connection.rollback();
+      return res.status(400).json({ message: "Chỉ có thể cập nhật phiếu phạt cho phiếu mượn quá hạn hoặc hỏng hóc." });
     }
 
     await connection.execute(
