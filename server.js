@@ -2176,7 +2176,7 @@ app.put("/api/loan-slips/:id/status", requireEmployee(async (req, res) => {
 
     const [slipRows] = await connection.execute(
       `
-        SELECT id, trang_thai
+        SELECT id, trang_thai, han_tra
         FROM phieumuon
         WHERE id = ?
         LIMIT 1
@@ -2189,8 +2189,13 @@ app.put("/api/loan-slips/:id/status", requireEmployee(async (req, res) => {
     }
 
     const currentStatus = slipRows[0].trang_thai;
+    const dueDate = String(slipRows[0].han_tra || "").slice(0, 10);
     if (["da_tra", "hong_hoc"].includes(currentStatus)) {
       throw new Error("Phiếu mượn này đã được xác nhận trả.");
+    }
+
+    if (status === "qua_han" && dueDate && returnDate <= dueDate) {
+      throw new Error("Ngày trả khi chọn quá hạn phải lớn hơn hạn trả của phiếu mượn.");
     }
 
     const [loanItems] = await connection.execute(
