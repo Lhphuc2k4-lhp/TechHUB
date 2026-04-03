@@ -659,14 +659,7 @@ async function syncDeviceImages(deviceId, imageUrls = []) {
 
 function mapLoanSlip(row) {
   const repairedRow = repairPayload(row);
-  const normalizedReturnCondition = normalizeText(repairedRow.return_condition || "");
-  let status = repairedRow.status;
-
-  if (normalizedReturnCondition === "hong hoc" || normalizedReturnCondition === "hong_hoc") {
-    status = "hong_hoc";
-  } else if (normalizedReturnCondition === "qua han" || normalizedReturnCondition === "qua_han") {
-    status = "qua_han";
-  }
+  const status = deriveLoanSlipStatus(repairedRow.status, repairedRow.return_condition);
 
   return {
     id: repairedRow.id,
@@ -908,6 +901,31 @@ function parseSlipCode(value, prefix) {
   if (!rawValue.startsWith(prefix)) return null;
   const numericPart = Number(rawValue.slice(prefix.length));
   return Number.isNaN(numericPart) ? null : numericPart;
+}
+
+function deriveLoanSlipStatus(statusValue = "", returnConditionValue = "") {
+  const normalizedStatus = normalizeText(statusValue);
+  const normalizedReturnCondition = normalizeText(returnConditionValue);
+
+  if (
+    ["hong_hoc", "hong hoc", "hong thiet bi", "hu hong", "hu hong thiet bi"].includes(normalizedStatus) ||
+    ["hong_hoc", "hong hoc", "hong thiet bi", "hu hong", "hu hong thiet bi"].includes(normalizedReturnCondition)
+  ) {
+    return "hong_hoc";
+  }
+
+  if (
+    ["qua_han", "qua han", "tre_han", "tre han"].includes(normalizedStatus) ||
+    ["qua_han", "qua han", "tre_han", "tre han"].includes(normalizedReturnCondition)
+  ) {
+    return "qua_han";
+  }
+
+  if (["da_tra", "da tra"].includes(normalizedStatus)) {
+    return "da_tra";
+  }
+
+  return "dang_muon";
 }
 
 function parseLoanStatus(value) {
@@ -2377,9 +2395,10 @@ app.post("/api/fine-slips", requireEmployee(async (req, res) => {
 
     const [loanSlipRows] = await connection.execute(
       `
-        SELECT id, trang_thai
-        FROM phieumuon
-        WHERE id = ?
+        SELECT pm.id, pm.trang_thai, pt.tinh_trang_sau_khi_tra AS return_condition
+        FROM phieumuon pm
+        LEFT JOIN phieutra pt ON pt.phieu_muon_id = pm.id
+        WHERE pm.id = ?
         LIMIT 1
       `,
       [loanSlipId]
@@ -2390,7 +2409,12 @@ app.post("/api/fine-slips", requireEmployee(async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy phiếu mượn." });
     }
 
-    if (!["qua_han", "hong_hoc"].includes(loanSlipRows[0].trang_thai)) {
+    const effectiveLoanSlipStatus = deriveLoanSlipStatus(
+      loanSlipRows[0].trang_thai,
+      loanSlipRows[0].return_condition
+    );
+
+    if (!["qua_han", "hong_hoc"].includes(effectiveLoanSlipStatus)) {
       await connection.rollback();
       return res.status(400).json({ message: "Chỉ có thể lập phiếu phạt cho phiếu mượn quá hạn hoặc hỏng hóc." });
     }
@@ -2483,9 +2507,10 @@ app.put("/api/fine-slips/:id", requireEmployee(async (req, res) => {
 
     const [loanSlipRows] = await connection.execute(
       `
-        SELECT id, trang_thai
-        FROM phieumuon
-        WHERE id = ?
+        SELECT pm.id, pm.trang_thai, pt.tinh_trang_sau_khi_tra AS return_condition
+        FROM phieumuon pm
+        LEFT JOIN phieutra pt ON pt.phieu_muon_id = pm.id
+        WHERE pm.id = ?
         LIMIT 1
       `,
       [loanSlipId]
@@ -2496,7 +2521,12 @@ app.put("/api/fine-slips/:id", requireEmployee(async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy phiếu mượn." });
     }
 
-    if (!["qua_han", "hong_hoc"].includes(loanSlipRows[0].trang_thai)) {
+    const effectiveLoanSlipStatus = deriveLoanSlipStatus(
+      loanSlipRows[0].trang_thai,
+      loanSlipRows[0].return_condition
+    );
+
+    if (!["qua_han", "hong_hoc"].includes(effectiveLoanSlipStatus)) {
       await connection.rollback();
       return res.status(400).json({ message: "Chỉ có thể cập nhật phiếu phạt cho phiếu mượn quá hạn hoặc hỏng hóc." });
     }
