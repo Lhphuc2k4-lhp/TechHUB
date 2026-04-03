@@ -726,9 +726,10 @@ async function syncLoanSlipAfterFinePayment(connection, { loanSlipId, employeeId
   const normalizedPaymentDate = paymentDate?.trim() || new Date().toISOString().slice(0, 10);
   const [loanRows] = await connection.execute(
     `
-      SELECT id, trang_thai
-      FROM phieumuon
-      WHERE id = ?
+      SELECT pm.id, pm.trang_thai, pt.tinh_trang_sau_khi_tra AS return_condition
+      FROM phieumuon pm
+      LEFT JOIN phieutra pt ON pt.phieu_muon_id = pm.id
+      WHERE pm.id = ?
       LIMIT 1
     `,
     [loanSlipId]
@@ -738,7 +739,12 @@ async function syncLoanSlipAfterFinePayment(connection, { loanSlipId, employeeId
     throw new Error("KhÃ´ng tÃ¬m tháº¥y phiáº¿u mÆ°á»£n liÃªn quan.");
   }
 
-  if (loanRows[0].trang_thai !== "qua_han") {
+  const effectiveLoanSlipStatus = deriveLoanSlipStatus(
+    loanRows[0].trang_thai,
+    loanRows[0].return_condition
+  );
+
+  if (!["qua_han", "hong_hoc"].includes(effectiveLoanSlipStatus)) {
     return false;
   }
 
@@ -771,6 +777,29 @@ async function syncLoanSlipAfterFinePayment(connection, { loanSlipId, employeeId
       `,
       [loanSlipId, employeeId, normalizedPaymentDate, getReturnConditionLabel("da_tra"), "Hoan tat sau khi thanh toan phieu phat."]
     );
+  }
+
+  if (effectiveLoanSlipStatus === "hong_hoc") {
+    const [loanItems] = await connection.execute(
+      `
+        SELECT thiet_bi_id
+        FROM chitietphieumuon
+        WHERE phieu_muon_id = ?
+      `,
+      [loanSlipId]
+    );
+
+    if (loanItems.length) {
+      const placeholders = loanItems.map(() => "?").join(", ");
+      await connection.execute(
+        `
+          UPDATE thietbi
+          SET tinh_trang_id = 1
+          WHERE id IN (${placeholders})
+        `,
+        loanItems.map((item) => item.thiet_bi_id)
+      );
+    }
   }
 
   return true;
