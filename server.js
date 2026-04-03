@@ -1964,15 +1964,20 @@ app.put("/api/devices/:id", requireAdmin(async (req, res) => {
 }));
 
 app.delete("/api/devices/:id", requireAdmin(async (req, res) => {
+  const connection = await getConnection();
+
   try {
     const deviceId = Number(req.params.id);
 
-    const rows = await query(`SELECT id, ten FROM thietbi WHERE id = ? LIMIT 1`, [deviceId]);
+    await connection.beginTransaction();
+
+    const [rows] = await connection.execute(`SELECT id, ten FROM thietbi WHERE id = ? LIMIT 1`, [deviceId]);
     if (!rows.length) {
+      await connection.rollback();
       return res.status(404).json({ message: "Không tìm thấy thiết bị." });
     }
 
-    const activeBorrowRows = await query(
+    const [activeBorrowRows] = await connection.execute(
       `
         SELECT COALESCE(SUM(ctpm.so_luong), 0) AS borrowed_quantity
         FROM chitietphieumuon ctpm
@@ -1984,18 +1989,20 @@ app.delete("/api/devices/:id", requireAdmin(async (req, res) => {
     );
 
     if (Number(activeBorrowRows[0]?.borrowed_quantity || 0) > 0) {
+      await connection.rollback();
       return res.status(400).json({ message: "Thiết bị đang nằm trong phiếu mượn, không thể xóa." });
     }
 
-    const historyRows = await query(`SELECT phieu_muon_id FROM chitietphieumuon WHERE thiet_bi_id = ? LIMIT 1`, [deviceId]);
-    if (historyRows.length) {
-      return res.status(400).json({ message: "Thiết bị đã có lịch sử phiếu mượn, không thể xóa." });
-    }
+    await connection.execute(`DELETE FROM chitietphieumuon WHERE thiet_bi_id = ?`, [deviceId]);
+    await connection.execute(`DELETE FROM thietbi WHERE id = ?`, [deviceId]);
 
-    await query(`DELETE FROM thietbi WHERE id = ?`, [deviceId]);
+    await connection.commit();
     return res.json({ message: "Xóa thiết bị thành công." });
   } catch (error) {
+    await connection.rollback();
     return res.status(500).json({ message: error.message || "Không thể xóa thiết bị.", error: error.message });
+  } finally {
+    connection.release();
   }
 }));
 
