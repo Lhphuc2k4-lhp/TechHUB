@@ -389,7 +389,14 @@ async function resolveEmployeeColumns() {
 }
 
 function normalizeText(value = "") {
-  return repairText(value)
+  const normalizedValue =
+    typeof value === "string"
+      ? value
+      : value === null || value === undefined
+        ? ""
+        : String(value);
+
+  return repairText(normalizedValue)
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/đ/g, "d")
@@ -659,7 +666,13 @@ async function syncDeviceImages(deviceId, imageUrls = []) {
 
 function mapLoanSlip(row) {
   const repairedRow = repairPayload(row);
-  const status = deriveLoanSlipStatus(repairedRow.status, repairedRow.return_condition);
+  let status = repairedRow.status || "dang_muon";
+
+  try {
+    status = deriveLoanSlipStatus(repairedRow.status, repairedRow.return_condition);
+  } catch (_error) {
+    status = repairedRow.status || "dang_muon";
+  }
 
   return {
     id: repairedRow.id,
@@ -904,8 +917,8 @@ function parseSlipCode(value, prefix) {
 }
 
 function deriveLoanSlipStatus(statusValue = "", returnConditionValue = "") {
-  const normalizedStatus = normalizeText(statusValue);
-  const normalizedReturnCondition = normalizeText(returnConditionValue);
+  const normalizedStatus = normalizeText(statusValue || "");
+  const normalizedReturnCondition = normalizeText(returnConditionValue || "");
 
   if (
     ["hong_hoc", "hong hoc", "hong thiet bi", "hu hong", "hu hong thiet bi"].includes(normalizedStatus) ||
