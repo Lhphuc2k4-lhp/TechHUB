@@ -454,7 +454,11 @@ function getBorrowedQuantitySql(alias) {
   `;
 }
 
-function buildDeviceSelectSql(extraWhereClause = "", extraOrderClause = "ORDER BY tb.id", extraLimitClause = "") {
+function buildDeviceSelectSql(
+  extraWhereClause = "",
+  extraOrderClause = "ORDER BY CAST(SUBSTRING(COALESCE(tb.ma_thiet_bi, 'TB0'), 3) AS UNSIGNED), tb.ma_thiet_bi ASC, tb.id ASC",
+  extraLimitClause = ""
+) {
   const borrowedQuantitySql = getBorrowedQuantitySql("tb");
   const primaryImageSql = `
     (
@@ -575,8 +579,26 @@ function normalizeDevicePayload(body = {}) {
   };
 }
 
+async function generateNextDeviceCode() {
+  const rows = await query(
+    `
+      SELECT ma_thiet_bi
+      FROM thietbi
+      WHERE ma_thiet_bi IS NOT NULL
+      ORDER BY CAST(SUBSTRING(ma_thiet_bi, 3) AS UNSIGNED) DESC, ma_thiet_bi DESC
+      LIMIT 1
+    `
+  );
+
+  const lastCode = String(rows[0]?.ma_thiet_bi || "");
+  const numericPart = Number(lastCode.replace(/\D/g, "")) || 0;
+  const nextCode = numericPart + 1;
+
+  return `TB${String(nextCode).padStart(3, "0")}`;
+}
+
 async function validateDevicePayload(payload, deviceId = null) {
-  if (!payload.code || !payload.name || !payload.typeId || !payload.statusId) {
+  if (!payload.name || !payload.typeId || !payload.statusId) {
     throw new Error("Vui lòng nhập đầy đủ thông tin thiết bị.");
   }
 
@@ -1826,6 +1848,7 @@ app.post(
 app.post("/api/devices", requireAdmin(async (req, res) => {
   try {
     const payload = normalizeDevicePayload(req.body);
+    payload.code = await generateNextDeviceCode();
     await validateDevicePayload(payload);
 
     const result = await query(
