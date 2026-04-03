@@ -2221,10 +2221,6 @@ app.put("/api/loan-slips/:id/status", requireEmployee(async (req, res) => {
       throw new Error("Phiếu mượn quá hạn chỉ được chuyển sang đã trả sau khi thanh toán phiếu phạt.");
     }
 
-    if (status === "qua_han" && dueDate && returnDate <= dueDate) {
-      throw new Error("Ngày trả khi chọn quá hạn phải lớn hơn hạn trả của phiếu mượn.");
-    }
-
     const [loanItems] = await connection.execute(
       `
         SELECT thiet_bi_id
