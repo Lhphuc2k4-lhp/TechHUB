@@ -183,7 +183,7 @@ function legacyGetMailerConfig() {
   const from = process.env.MAIL_FROM?.trim() || user;
 
   if (!host || !port || !user || !pass || !from) {
-    throw new Error("ChÆ°a cáº¥u hÃ¬nh SMTP Ä‘á»ƒ gá»­i mail OTP.");
+    throw new Error("Chưa cấu hình SMTP để gửi mail OTP.");
   }
 
   return {
@@ -209,19 +209,19 @@ async function legacySendPasswordResetOtpEmail(email, employeeName, otp) {
   await transporter.sendMail({
     from,
     to: email,
-    subject: "TechHUB - MÃ£ OTP Ä‘áº·t láº¡i máº­t kháº©u",
-    text: `Xin chÃ o ${employeeName}, mÃ£ OTP Ä‘áº·t láº¡i máº­t kháº©u cá»§a báº¡n lÃ  ${otp}. MÃ£ cÃ³ hiá»‡u lá»±c trong 10 phÃºt.`,
+    subject: "TechHUB - Mã OTP đặt lại mật khẩu",
+    text: `Xin chào ${employeeName}, mã OTP đặt lại mật khẩu của bạn là ${otp}. Mã có hiệu lực trong 10 phút.`,
     html: `
       <div style="font-family: Arial, Helvetica, sans-serif; color: #1f2937; line-height: 1.6;">
-        <h2 style="margin-bottom: 8px;">TechHUB - Äáº·t láº¡i máº­t kháº©u</h2>
-        <p>Xin chÃ o <strong>${employeeName}</strong>,</p>
-        <p>Báº¡n vá»«a yÃªu cáº§u Ä‘áº·t láº¡i máº­t kháº©u cho tÃ i khoáº£n nhÃ¢n viÃªn.</p>
-        <p>MÃ£ OTP cá»§a báº¡n lÃ :</p>
+        <h2 style="margin-bottom: 8px;">TechHUB - Đặt lại mật khẩu</h2>
+        <p>Xin chào <strong>${employeeName}</strong>,</p>
+        <p>Bạn vừa yêu cầu đặt lại mật khẩu cho tài khoản nhân viên.</p>
+        <p>Mã OTP của bạn là:</p>
         <div style="font-size: 28px; font-weight: 700; letter-spacing: 8px; color: #b42318; margin: 16px 0;">
           ${otp}
         </div>
-        <p>MÃ£ nÃ y cÃ³ hiá»‡u lá»±c trong <strong>10 phÃºt</strong>.</p>
-        <p>Náº¿u báº¡n khÃ´ng thá»±c hiá»‡n yÃªu cáº§u nÃ y, vui lÃ²ng bá» qua email.</p>
+        <p>Mã này có hiệu lực trong <strong>10 phút</strong>.</p>
+        <p>Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email.</p>
       </div>
     `,
   });
@@ -232,25 +232,25 @@ function legacyGetFriendlySmtpErrorMessage(error) {
   const normalized = message.toLowerCase();
 
   if (normalized.includes("timeout")) {
-    return "Háº¿t thá»i gian káº¿t ná»‘i khi gá»­i email. Vui lÃ²ng kiá»ƒm tra cáº¥u hÃ¬nh mÃ¡y chá»§ trÃªn Railway.";
+    return "Hết thời gian kết nối khi gửi email. Vui lòng kiểm tra cấu hình máy chủ trên Railway.";
   }
 
   if (normalized.includes("auth")) {
-    return "MÃ¡y chá»§ email Ä‘ang tá»« chá»‘i Ä‘Äƒng nháº­p. Vui lÃ²ng kiá»ƒm tra láº¡i tÃ i khoáº£n gá»­i thÆ°.";
+    return "Máy chủ email đang từ chối đăng nhập. Vui lòng kiểm tra lại tài khoản gửi thư.";
   }
 
   if (normalized.includes("smtp")) {
     return message;
   }
 
-  return message || "KhÃ´ng thá»ƒ gá»­i mÃ£ OTP.";
+  return message || "Không thể gửi mã OTP.";
 }
 
 function parseMailFrom(value = "") {
   const trimmedValue = value.trim();
 
   if (!trimmedValue) {
-    throw new Error("ChÆ°a cáº¥u hÃ¬nh MAIL_FROM trÃªn Railway.");
+    throw new Error("Chưa cấu hình MAIL_FROM trên Railway.");
   }
 
   const matchedSender = trimmedValue.match(/^(.*)<([^>]+)>$/);
@@ -272,22 +272,22 @@ async function sendPasswordResetOtpEmail(email, employeeName, otp) {
   const sender = parseMailFrom(process.env.MAIL_FROM?.trim() || "");
 
   if (!apiKey) {
-    throw new Error("ChÆ°a cáº¥u hÃ¬nh BREVO_API_KEY trÃªn Railway.");
+    throw new Error("Chưa cấu hình BREVO_API_KEY trên Railway.");
   }
 
-  const subject = "TechHUB - MÃ£ OTP Ä‘áº·t láº¡i máº­t kháº©u";
-  const textContent = `Xin chÃ o ${employeeName}, mÃ£ OTP Ä‘áº·t láº¡i máº­t kháº©u cá»§a báº¡n lÃ  ${otp}. MÃ£ cÃ³ hiá»‡u lá»±c trong 10 phÃºt.`;
+  const subject = "TechHUB - Mã OTP đặt lại mật khẩu";
+  const textContent = `Xin chào ${employeeName}, mã OTP đặt lại mật khẩu của bạn là ${otp}. Mã có hiệu lực trong 10 phút.`;
   const htmlContent = `
     <div style="font-family: Arial, Helvetica, sans-serif; color: #1f2937; line-height: 1.6;">
-      <h2 style="margin-bottom: 8px;">TechHUB - Äáº·t láº¡i máº­t kháº©u</h2>
-      <p>Xin chÃ o <strong>${employeeName}</strong>,</p>
-      <p>Báº¡n vá»«a yÃªu cáº§u Ä‘áº·t láº¡i máº­t kháº©u cho tÃ i khoáº£n nhÃ¢n viÃªn.</p>
-      <p>MÃ£ OTP cá»§a báº¡n lÃ :</p>
+      <h2 style="margin-bottom: 8px;">TechHUB - Đặt lại mật khẩu</h2>
+      <p>Xin chào <strong>${employeeName}</strong>,</p>
+      <p>Bạn vừa yêu cầu đặt lại mật khẩu cho tài khoản nhân viên.</p>
+      <p>Mã OTP của bạn là:</p>
       <div style="font-size: 28px; font-weight: 700; letter-spacing: 8px; color: #b42318; margin: 16px 0;">
         ${otp}
       </div>
-      <p>MÃ£ nÃ y cÃ³ hiá»‡u lá»±c trong <strong>10 phÃºt</strong>.</p>
-      <p>Náº¿u báº¡n khÃ´ng thá»±c hiá»‡n yÃªu cáº§u nÃ y, vui lÃ²ng bá» qua email.</p>
+      <p>Mã này có hiệu lực trong <strong>10 phút</strong>.</p>
+      <p>Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email.</p>
     </div>
   `;
 
@@ -318,19 +318,19 @@ function getFriendlySmtpErrorMessage(error) {
   const normalized = message.toLowerCase();
 
   if (normalized.includes("brevo_api_key")) {
-    return "Railway chÆ°a cÃ³ BREVO_API_KEY Ä‘á»ƒ gá»­i email OTP.";
+    return "Railway chưa có BREVO_API_KEY để gửi email OTP.";
   }
 
   if (normalized.includes("mail_from")) {
-    return "Railway chÆ°a cáº¥u hÃ¬nh MAIL_FROM há»£p lá»‡ cho Brevo.";
+    return "Railway chưa cấu hình MAIL_FROM hợp lệ cho Brevo.";
   }
 
   if (normalized.includes("unauthorized") || normalized.includes("invalid api key")) {
-    return "BREVO_API_KEY khÃ´ng há»£p lá»‡. Vui lÃ²ng táº¡o API key má»›i trong Brevo.";
+    return "BREVO_API_KEY không hợp lệ. Vui lòng tạo API key mới trong Brevo.";
   }
 
   if (normalized.includes("sender")) {
-    return "Email gá»­i chÆ°a Ä‘Æ°á»£c xÃ¡c minh trÃªn Brevo. Vui lÃ²ng vÃ o Senders Ä‘á»ƒ xÃ¡c minh MAIL_FROM.";
+    return "Email gửi chưa được xác minh trên Brevo. Vui lòng vào Senders để xác minh MAIL_FROM.";
   }
 
   if (normalized.includes("brevo api error")) {
@@ -338,10 +338,10 @@ function getFriendlySmtpErrorMessage(error) {
   }
 
   if (normalized.includes("timeout") || normalized.includes("fetch failed")) {
-    return "MÃ¡y chá»§ Railway khÃ´ng káº¿t ná»‘i Ä‘Æ°á»£c tá»›i Brevo API. Vui lÃ²ng redeploy láº¡i vÃ  thá»­ láº¡i sau.";
+    return "Máy chủ Railway không kết nối được tới Brevo API. Vui lòng redeploy lại và thử lại sau.";
   }
 
-  return message || "KhÃ´ng thá»ƒ gá»­i mÃ£ OTP qua Brevo.";
+  return message || "Không thể gửi mã OTP qua Brevo.";
 }
 
 async function resolveDeviceImageColumn() {
@@ -1318,7 +1318,7 @@ async function handleLogin(req, res) {
     const password = source.password?.trim();
 
     if (!identifier || !password) {
-      return res.status(400).json({ message: "Vui lÃ²ng nháº­p tÃ i khoáº£n vÃ  máº­t kháº©u." });
+      return res.status(400).json({ message: "Vui lòng nhập tài khoản và mật khẩu." });
     }
 
     const rows = await query(
@@ -1339,17 +1339,17 @@ async function handleLogin(req, res) {
     );
 
     if (!rows.length) {
-      return res.status(401).json({ message: "TÃ i khoáº£n khÃ´ng tá»“n táº¡i." });
+      return res.status(401).json({ message: "Tài khoản không tồn tại." });
     }
 
     const employee = rows[0];
     if (String(employee.password_admin) !== String(password)) {
-      return res.status(401).json({ message: "Máº­t kháº©u khÃ´ng Ä‘Ãºng." });
+      return res.status(401).json({ message: "Mật khẩu không đúng." });
     }
 
-    return res.json({ message: "ÄÄƒng nháº­p thÃ nh cÃ´ng.", user: mapEmployee(employee) });
+    return res.json({ message: "Đăng nhập thành công.", user: mapEmployee(employee) });
   } catch (error) {
-    return res.status(500).json({ message: "KhÃ´ng thá»ƒ Ä‘Äƒng nháº­p.", error: error.message });
+    return res.status(500).json({ message: "Không thể đăng nhập.", error: error.message });
   }
 }
 
@@ -1361,7 +1361,7 @@ app.post("/api/auth/forgot-password/request", async (req, res) => {
     const email = req.body.email?.trim().toLowerCase();
 
     if (!email) {
-      return res.status(400).json({ message: "Vui lÃ²ng nháº­p email Ä‘á»ƒ nháº­n mÃ£ OTP." });
+      return res.status(400).json({ message: "Vui lòng nhập email để nhận mã OTP." });
     }
 
     const rows = await query(
@@ -1378,7 +1378,7 @@ app.post("/api/auth/forgot-password/request", async (req, res) => {
     );
 
     if (!rows.length) {
-      return res.status(404).json({ message: "Email nÃ y khÃ´ng tá»“n táº¡i trong há»‡ thá»‘ng." });
+      return res.status(404).json({ message: "Email này không tồn tại trong hệ thống." });
     }
 
     const employee = rows[0];
@@ -1393,7 +1393,7 @@ app.post("/api/auth/forgot-password/request", async (req, res) => {
     await sendPasswordResetOtpEmail(employee.email, employee.full_name, otp);
 
     return res.json({
-      message: "ÄÃ£ gá»­i mÃ£ OTP qua email. Vui lÃ²ng kiá»ƒm tra há»™p thÆ° cá»§a báº¡n.",
+      message: "Đã gửi mã OTP qua email. Vui lòng kiểm tra hộp thư của bạn.",
     });
   } catch (error) {
     const friendlyMessage = getFriendlySmtpErrorMessage(error);
@@ -1416,25 +1416,25 @@ app.post("/api/auth/forgot-password/reset", async (req, res) => {
     const newPassword = req.body.newPassword?.trim();
 
     if (!email || !otp || !newPassword) {
-      return res.status(400).json({ message: "Vui lÃ²ng nháº­p Ä‘áº§y Ä‘á»§ email, mÃ£ OTP vÃ  máº­t kháº©u má»›i." });
+      return res.status(400).json({ message: "Vui lòng nhập đầy đủ email, mã OTP và mật khẩu mới." });
     }
 
     if (newPassword.length < 6) {
-      return res.status(400).json({ message: "Máº­t kháº©u má»›i pháº£i cÃ³ Ã­t nháº¥t 6 kÃ½ tá»±." });
+      return res.status(400).json({ message: "Mật khẩu mới phải có ít nhất 6 ký tự." });
     }
 
     const otpRecord = passwordResetOtps.get(email);
     if (!otpRecord) {
-      return res.status(400).json({ message: "MÃ£ OTP khÃ´ng tá»“n táº¡i hoáº·c Ä‘Ã£ háº¿t háº¡n." });
+      return res.status(400).json({ message: "Mã OTP không tồn tại hoặc đã hết hạn." });
     }
 
     if (otpRecord.expiresAt < Date.now()) {
       passwordResetOtps.delete(email);
-      return res.status(400).json({ message: "MÃ£ OTP Ä‘Ã£ háº¿t háº¡n. Vui lÃ²ng yÃªu cáº§u mÃ£ má»›i." });
+      return res.status(400).json({ message: "Mã OTP đã hết hạn. Vui lòng yêu cầu mã mới." });
     }
 
     if (otpRecord.otpHash !== hashOtp(otp)) {
-      return res.status(400).json({ message: "MÃ£ OTP khÃ´ng Ä‘Ãºng." });
+      return res.status(400).json({ message: "Mã OTP không đúng." });
     }
 
     const rows = await query(`SELECT id FROM nhanvien WHERE id = ? AND LOWER(email) = ? LIMIT 1`, [
@@ -1444,15 +1444,15 @@ app.post("/api/auth/forgot-password/reset", async (req, res) => {
 
     if (!rows.length) {
       passwordResetOtps.delete(email);
-      return res.status(404).json({ message: "KhÃ´ng tÃ¬m tháº¥y tÃ i khoáº£n cáº§n Ä‘áº·t láº¡i máº­t kháº©u." });
+      return res.status(404).json({ message: "Không tìm thấy tài khoản cần đặt lại mật khẩu." });
     }
 
     await query(`UPDATE nhanvien SET password_admin = ? WHERE id = ?`, [newPassword, otpRecord.employeeId]);
     passwordResetOtps.delete(email);
 
-    return res.json({ message: "Äáº·t láº¡i máº­t kháº©u thÃ nh cÃ´ng. Báº¡n cÃ³ thá»ƒ Ä‘Äƒng nháº­p láº¡i ngay bÃ¢y giá»." });
+    return res.json({ message: "Đặt lại mật khẩu thành công. Bạn có thể đăng nhập lại ngay bây giờ." });
   } catch (error) {
-    return res.status(500).json({ message: "KhÃ´ng thá»ƒ Ä‘áº·t láº¡i máº­t kháº©u.", error: error.message });
+    return res.status(500).json({ message: "Không thể đặt lại mật khẩu.", error: error.message });
   }
 });
 
